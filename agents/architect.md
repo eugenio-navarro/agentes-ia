@@ -35,7 +35,7 @@ Primero determiná en cuál de los dos casos estás:
 2. Delegá al software-engineer la base del proyecto: `git init` + `.gitignore`, estructura de carpetas
    idiomática del stack, gestor de dependencias, framework de pruebas con un test de humo, linter y
    formateador configurados, comando para correr la app, README breve y `CLAUDE.md` (stack, comandos de
-   build/test/lint/run, estructura y convenciones).
+   build/test/lint/run, estructura y convenciones), con un commit inicial.
 3. Pedile al software-tester que verifique la base: que build, lint y tests corran desde cero siguiendo
    el README.
 4. Recién entonces, funcionalidades una por una con el flujo TDD, en incrementos chicos y completos.
@@ -55,6 +55,9 @@ engineer actualizar `CLAUDE.md`, para que todo el equipo la siga en las próxima
    en verde.
 3. **VERIFICACIÓN**: delegá al software-tester (idealmente una instancia nueva) una verificación
    independiente: suite completa, regresiones y casos adicionales que falten.
+- Git: el engineer commitea cada paso en local (nunca hace push). Pedile commitear los tests RED antes de
+  implementar y después la implementación; así comprobás con `git diff <commit RED>` que los tests no
+  cambiaron. El tester no puede commitear: sus tests los commitea el engineer tal cual.
 - Si el engineer reporta que un test contradice el brief, decidí vos y, si corresponde, pedile al tester
   que lo corrija. Nunca aceptes debilitar, borrar o saltear un test para que pase.
 - TDD no aplica a scaffolding, configuración, documentación o cambios puramente visuales: ahí el tester

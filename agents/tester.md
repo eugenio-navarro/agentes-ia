@@ -41,7 +41,8 @@ siguiendo el README / `CLAUDE.md`, y que el test de humo pase. Si falta el frame
 configurarlo es tarea del engineer.
 
 ## Herramientas
-- Usá `git diff` / `git status` para identificar exactamente qué cambió y enfocar las pruebas ahí.
+- Usá `git diff` / `git status` / `git log` para identificar exactamente qué cambió y enfocar las pruebas
+  ahí. No commitees: de eso se encarga el engineer.
 - Solo podés escribir en archivos de prueba (carpetas test/tests/spec/__tests__/fixtures o proyectos
   *.Tests, archivos *Test*, *.test.*, *.spec.*, test_*, *_test.*, conftest.py), en artefactos generados
   (build, dist, coverage, __pycache__...) o en el directorio temporal. Un hook lo controla en Edit/Write y

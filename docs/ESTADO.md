@@ -1,6 +1,6 @@
 # Estado actual
 
-**Versión 1.0 · 2026-10-05**
+**Versión 1.1 · 2026-10-05**
 
 Este es el contexto vigente del equipo. Actualizalo cada vez que cambie un agente; el detalle de cada
 cambio va en [BITACORA.md](BITACORA.md).
@@ -13,6 +13,7 @@ cambio va en [BITACORA.md](BITACORA.md).
 | Effort | xhigh | high | high |
 | Edita código | No (solo su memoria) | Sí | Solo tests, artefactos y temp |
 | Shell | Solo lectura | Completo | Sin escrituras en producción ni git destructivo |
+| Git | Solo lectura | Commits locales, sin push ni reescritura | Sin commits |
 | Extras | Memoria entre proyectos, prompt inicial, delega solo a engineer/tester | Formato + lint al editar | Playwright (navegador real) |
 
 ## Flujo
@@ -33,6 +34,8 @@ cambio va en [BITACORA.md](BITACORA.md).
   se pidió y no lo que se hizo.
 - **Los límites se aplican con hooks y no solo con el prompt.** Los hooks filtran por `agent_type`,
   porque los del agente principal se aplican a toda la sesión, incluidos sus subagentes.
+- **El engineer commitea cada paso TDD en local**: commitear los tests RED antes de implementar le
+  permite al architect comprobar con `git diff` que no se modificaron. Publicar (push) es del usuario.
 - **El worktree no está fijo en el engineer**: si lo estuviera, el tester no vería los cambios. El
   architect decide cuándo usarlo.
 - **El formateador solo usa herramientas que el proyecto ya tiene configuradas**: no impone estilo.
@@ -57,4 +60,5 @@ cambio va en [BITACORA.md](BITACORA.md).
 - Prueba de punta a punta en un repo existente ("Agregá esPar con sus tests"): architect → engineer →
   tester, 7 tests en verde.
 - Prueba de proyecto nuevo (CLI de temperaturas): base → verificación de la base → RED → GREEN →
-  verificación, en ese orden; el guard bloqueó solo lo que debía.
+  verificación, y un segundo ciclo TDD para un bug de overflow; 59 tests en verde. El guard bloqueó
+  solo lo que debía.

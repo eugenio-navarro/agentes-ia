@@ -34,8 +34,9 @@ claude --agent software-architect      # o el equivalente en tu herramienta
 - **Proyecto nuevo**: contale la idea, respondé sus preguntas de stack y dejá que arme la base
   (git, estructura, tests, linter, README, `CLAUDE.md`). Después pedí funcionalidades de a una.
 - **Proyecto existente**: pedí directamente la funcionalidad o el bug a corregir.
-- Pedí el *qué* y el *para qué*, con criterios de aceptación si los tenés. Revisá con `git diff`
-  y commiteá vos: los agentes no commitean.
+- Pedí el *qué* y el *para qué*, con criterios de aceptación si los tenés.
+- El engineer commitea cada paso en local (tests RED, implementación); nunca hace push. Revisá con
+  `git log` / `git show` y publicá vos (`git push`).
 - Para cambios chicos (un texto, un rename) no hace falta el equipo: usá una sesión normal.
 
 ---

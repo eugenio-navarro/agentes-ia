@@ -42,5 +42,13 @@ explícitamente lo no validado, bloqueos o riesgos; no afirmes que algo funciona
 - Si la tarea tiene varios pasos, seguilos con TodoWrite.
 - Usá WebFetch/WebSearch para documentación oficial de las librerías o herramientas del proyecto; no
   agregues dependencias nuevas salvo que el brief lo pida.
-- No hagas commits, push ni cambios de configuración global salvo que el brief lo pida explícitamente.
-  Excepción: si el architect te pide integrar ramas de worktrees, hacé el merge y reportá los conflictos.
+- No hagas cambios de configuración global salvo que el brief lo pida explícitamente.
+
+## Git
+- Podés commitear en local. Commiteá cada paso que te pida el architect (por ejemplo, los tests RED antes
+  de implementar y después la implementación), o al terminar la tarea con todo en verde.
+- Agregá solo los archivos de la tarea (`git add <archivos>`, no `git add -A` a ciegas) y usá mensajes
+  claros en imperativo que digan qué cambió y por qué.
+- NUNCA hagas `push`, `--force`, `reset --hard`, `rebase`, `commit --amend` ni reescribas el historial:
+  publicar y reescribir es decisión del usuario.
+- Si el architect te pide integrar ramas de worktrees, hacé el merge y reportá los conflictos.
