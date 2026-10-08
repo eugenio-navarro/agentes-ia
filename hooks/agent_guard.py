@@ -255,9 +255,6 @@ def main():
         data = json.load(sys.stdin)
     except Exception:
         return
-    if os.environ.get("AGENT_GUARD_DEBUG"):  # opcional: loguea cada llamada (diagnóstico)
-        with open(os.environ["AGENT_GUARD_DEBUG"], "a", encoding="utf-8") as f:
-            f.write(json.dumps({k: v for k, v in data.items() if k != "tool_input"}) + "\n")
     # Hooks of an agent run with `claude --agent` apply to the whole session,
     # including the subagents it spawns: only guard the agent's own tool calls.
     agent = data.get("agent_type") or ""
