@@ -75,3 +75,43 @@ Requisitos: Python 3 en el PATH (hooks) y Node/npx (Playwright del tester).
 - Filosofía: en las instrucciones personalizadas globales (verificá la ruta en la documentación de tu versión).
 - `tools`: `read`, `search`, `edit`, `execute`, `agent`. El architect no lleva `edit` ni `execute`.
 - Sin hooks: los límites del tester dependen de su prompt; avisale al usuario.
+
+## Opcional: conservar los chats y mostrarlos en la app
+
+Módulo aparte de los agentes, solo para Claude Code. Instalalo únicamente si el usuario lo pide.
+
+- **Qué hace:** pone `cleanupPeriodDays: 3650` para que Claude Code no borre los chats a los 30 días
+  y muestra en la app de escritorio (pestaña Code) los chats iniciados en la terminal y en VS Code.
+  Para eso agrega hooks globales `SessionStart`/`SessionEnd` en `~/.claude/settings.json`, combinados
+  con lo que ya haya.
+- **Instalar:** copiá `conservar_y_mostrar_chats_en_app.py` a `~/.claude/chats-claude/` y ejecutalo
+  desde ahí. Nunca lo ejecutes desde el clon del repo: los hooks guardan la ruta absoluta del archivo.
+
+  Windows (PowerShell, desde la raíz del repo):
+
+  ```powershell
+  New-Item -ItemType Directory -Force "$HOME\.claude\chats-claude" | Out-Null
+  Copy-Item conservar_y_mostrar_chats_en_app.py "$HOME\.claude\chats-claude\"
+  python "$HOME\.claude\chats-claude\conservar_y_mostrar_chats_en_app.py"
+  ```
+
+  macOS/Linux (desde la raíz del repo):
+
+  ```bash
+  mkdir -p ~/.claude/chats-claude
+  cp conservar_y_mostrar_chats_en_app.py ~/.claude/chats-claude/
+  python3 ~/.claude/chats-claude/conservar_y_mostrar_chats_en_app.py
+  ```
+
+  Si antes se instaló con el nombre `chats_claude.py`, corré primero
+  `python <ruta>/chats_claude.py desactivar` para no dejar sus hooks duplicados.
+- **Actualizar:** volvé a copiarlo y a ejecutarlo. Es idempotente: no duplica hooks ni chats.
+- **Verificar:** `python ~/.claude/chats-claude/conservar_y_mostrar_chats_en_app.py estado` muestra
+  `cleanupPeriodDays`, los hooks activos, el índice de la app y qué chats importaría.
+- **Desinstalar:** con la misma ruta, ejecutá `desactivar`, después `deshacer --confirmar` y, si se
+  quiere volver a 30 días, `conservar --dias 30 --forzar` (sin `--forzar` no baja un valor mayor).
+  Después podés borrar `~/.claude/chats-claude/`, aunque ahí está el registro de lo que se importó.
+- **Requisitos y limitaciones:** Python 3.8+. Depende de un formato interno de la app que puede
+  cambiar con cualquier actualización: si no coincide, no hace nada. Solo está probado en Windows; en
+  macOS y Linux, si no encuentra el índice de la app, no hace nada. Los chats aparecen al reiniciar la
+  app. No incluye las sesiones en la nube.

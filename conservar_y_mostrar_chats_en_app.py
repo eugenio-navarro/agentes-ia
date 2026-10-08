@@ -3,30 +3,29 @@
 Archivo independiente: no lo usa la instalación de los agentes. Requiere Python 3.8+ y solo usa
 la biblioteca estándar. Los paths se calculan en cada PC (respeta CLAUDE_CONFIG_DIR).
 
-Uso: `python chats_claude.py` (sin argumentos) lo deja todo configurado de una vez: conserva los
-chats, activa la sincronización automática e importa los chats existentes. Se puede volver a correr
-sin riesgo. Solo hace falta repetirlo si movés este archivo o cambiás de Python.
+Uso: `python conservar_y_mostrar_chats_en_app.py` (sin argumentos) lo deja todo configurado de una
+vez: conserva los chats, activa la sincronización automática e importa los chats existentes. Se puede
+volver a correr sin riesgo. Solo hace falta repetirlo si movés este archivo o cambiás de Python.
 
-Comandos sueltos (todos combinan con lo que ya haya en ~/.claude/settings.json y guardan una copia
-settings.json.bak-<fecha> antes de modificarlo):
+Comandos sueltos (`python conservar_y_mostrar_chats_en_app.py <comando>`). Todos combinan con lo que
+ya haya en ~/.claude/settings.json y guardan una copia settings.json.bak-<fecha> antes de
+modificarlo:
 
-    python chats_claude.py instalar [--dias N]    Lo mismo que correrlo sin argumentos.
-    python chats_claude.py conservar [--dias N]   Fija cleanupPeriodDays (por defecto 3650) para
-                                                  que Claude Code no borre los chats a los 30 días.
-                                                  Si ya hay un valor mayor, lo deja.
-    python chats_claude.py sincronizar [--simular] [--indice DIR]
-                                                  Agrega al índice de la app los chats locales que
-                                                  no tienen entrada (terminal, VS Code).
-    python chats_claude.py activar                Agrega hooks globales SessionStart (en segundo
-                                                  plano) y SessionEnd que corren `sincronizar`.
-    python chats_claude.py desactivar             Quita solo esos hooks.
-    python chats_claude.py deshacer [--confirmar] Borra del índice las entradas que creó este
-                                                  script (según el registro). Sin --confirmar,
-                                                  solo las lista.
-    python chats_claude.py estado                 Muestra la configuración y qué importaría.
+    instalar [--dias N]       Lo mismo que correrlo sin argumentos.
+    conservar [--dias N]      Fija cleanupPeriodDays (por defecto 3650) para que Claude Code no
+                              borre los chats a los 30 días. Si ya hay un valor mayor, lo deja.
+    sincronizar [--simular] [--indice DIR]
+                              Agrega al índice de la app los chats locales que no tienen entrada
+                              (terminal, VS Code).
+    activar                   Agrega hooks globales SessionStart (en segundo plano) y SessionEnd
+                              que corren `sincronizar`.
+    desactivar                Quita solo esos hooks.
+    deshacer [--confirmar]    Borra del índice las entradas que creó este script (según el
+                              registro). Sin --confirmar, solo las lista.
+    estado                    Muestra la configuración y qué importaría.
 
 Desinstalar: `desactivar`, después `deshacer --confirmar` y, si querés volver a 30 días,
-`conservar --dias 30` (o borrá la clave cleanupPeriodDays de settings.json).
+`conservar --dias 30 --forzar` (o borrá la clave cleanupPeriodDays de settings.json).
 
 Cómo sincroniza:
 - Lee ~/.claude/projects/*/*.jsonl y omite los chats que ya tienen entrada, los marcados con

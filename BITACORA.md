@@ -32,6 +32,7 @@ registrala como `pendiente`.
 
 | Fecha | Agente | Qué pasó | Causa | Cambio | Estado |
 |---|---|---|---|---|---|
+| 2026-10-08 | — | El script de chats pasó a módulo opcional del repo | Pedido del usuario; ya probado en Windows | `extras/chats_claude.py` → `conservar_y_mostrar_chats_en_app.py` en la raíz, sin cambios de lógica. Se instala copiándolo a `~/.claude/chats-claude/` (los hooks guardan su ruta absoluta); pasos en `INSTALAR.md` | resuelto |
 | 2026-10-08 | — | Conservar los chats y mostrarlos en la app de escritorio | Pedido del usuario | `extras/chats_claude.py` independiente de la instalación: `cleanupPeriodDays` + importación al índice interno de la app (formato sin documentar; macOS/Linux sin probar) | resuelto |
 | 2026-10-08 | architect | Formato de respuesta al usuario por sección | Pedido del usuario | Reporte final: arquitectura extensa, implementación en bullets, tests en una línea si pasan | resuelto |
 | 2026-10-08 | — | README reducido a recordatorio de uso | Pedido del usuario | Instalación a `INSTALAR.md`; `ESTADO.md` integrado acá; guard sin modo debug | resuelto |
