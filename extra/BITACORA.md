@@ -23,7 +23,7 @@ conoce y qué fallas aparecieron en el uso real.
 - Haiku puede escribir tests flojos en modo RED. Si pasa, subir el tester a `medio`.
 - `AskUserQuestion` y `TodoWrite` no están disponibles en modo no interactivo (`claude -p`).
 - LSP instalado solo para Python (pyright).
-- Las secciones de OpenCode y Copilot CLI de INSTALAR.md todavía no se probaron.
+- Las secciones de OpenCode y Copilot CLI de `extra/INSTALAR.md` todavía no se probaron.
 
 ## Fallas y cambios
 
@@ -32,6 +32,8 @@ registrala como `pendiente`.
 
 | Fecha | Agente | Qué pasó | Causa | Cambio | Estado |
 |---|---|---|---|---|---|
+| 2026-10-08 | — | Reorganización de archivos | Pedido del usuario | `INSTALAR.md` y `BITACORA.md` a `extra/` (el README queda en la raíz para que GitHub lo muestre); el script pasó a `configuración_chats_claude_code_app.py` y reconoce los hooks de sus nombres anteriores para no duplicarlos | resuelto |
+| 2026-10-08 | tester | El guard bloqueaba `Assets/Tests/...` en Linux/macOS (fallaba `test_edita_archivos_de_test`) | `os.path.normcase` solo pasa a minúsculas en Windows; `Tests` no coincidía con `tests` | `is_test_path` compara las carpetas en minúsculas en todos los sistemas | resuelto |
 | 2026-10-08 | — | El script de chats pasó a módulo opcional del repo | Pedido del usuario; ya probado en Windows | `extras/chats_claude.py` → `conservar_y_mostrar_chats_en_app.py` en la raíz, sin cambios de lógica. Se instala copiándolo a `~/.claude/chats-claude/` (los hooks guardan su ruta absoluta); pasos en `INSTALAR.md` | resuelto |
 | 2026-10-08 | — | Conservar los chats y mostrarlos en la app de escritorio | Pedido del usuario | `extras/chats_claude.py` independiente de la instalación: `cleanupPeriodDays` + importación al índice interno de la app (formato sin documentar; macOS/Linux sin probar) | resuelto |
 | 2026-10-08 | architect | Formato de respuesta al usuario por sección | Pedido del usuario | Reporte final: arquitectura extensa, implementación en bullets, tests en una línea si pasan | resuelto |

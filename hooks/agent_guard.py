@@ -143,7 +143,7 @@ def is_test_path(path, cwd=""):
     tmp = os.path.normcase(os.path.abspath(tempfile.gettempdir()))
     if norm.startswith(tmp):
         return True
-    parts = re.split(r"[\\/]", norm)
+    parts = re.split(r"[\\/]", norm.lower())  # normcase only lowercases on Windows
     if any(p in TEST_DIRS or p in GENERATED_DIRS or TEST_DIR_SUFFIX.search(p)
            for p in parts[:-1]):
         return True

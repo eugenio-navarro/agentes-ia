@@ -3,12 +3,12 @@
 Archivo independiente: no lo usa la instalación de los agentes. Requiere Python 3.8+ y solo usa
 la biblioteca estándar. Los paths se calculan en cada PC (respeta CLAUDE_CONFIG_DIR).
 
-Uso: `python conservar_y_mostrar_chats_en_app.py` (sin argumentos) lo deja todo configurado de una
-vez: conserva los chats, activa la sincronización automática e importa los chats existentes. Se puede
-volver a correr sin riesgo. Solo hace falta repetirlo si movés este archivo o cambiás de Python.
+Uso: `python configuración_chats_claude_code_app.py` (sin argumentos) lo deja todo configurado de
+una vez: conserva los chats, activa la sincronización automática e importa los chats existentes. Se
+puede volver a correr sin riesgo. Solo hace falta repetirlo si movés este archivo o cambiás de Python.
 
-Comandos sueltos (`python conservar_y_mostrar_chats_en_app.py <comando>`). Todos combinan con lo que
-ya haya en ~/.claude/settings.json y guardan una copia settings.json.bak-<fecha> antes de
+Comandos sueltos (`python configuración_chats_claude_code_app.py <comando>`). Todos combinan con lo
+que ya haya en ~/.claude/settings.json y guardan una copia settings.json.bak-<fecha> antes de
 modificarlo:
 
     instalar [--dias N]       Lo mismo que correrlo sin argumentos.
@@ -56,11 +56,15 @@ import shutil
 import sys
 import tempfile
 import time
+import unicodedata
 import uuid
 from pathlib import Path
 
 SCRIPT = Path(__file__).resolve()
 MARCA = SCRIPT.name
+# Nombres que tuvo este archivo: `activar` reemplaza sus hooks en vez de duplicarlos.
+NOMBRES = {unicodedata.normalize("NFC", n) for n in
+           (MARCA, "chats_claude.py", "conservar_y_mostrar_chats_en_app.py")}
 DIAS_POR_DEFECTO = 3650
 
 # Campos de la plantilla que describen su propia sesión y no deben copiarse.
@@ -215,7 +219,8 @@ def es_nuestro(handler):
     if not isinstance(handler, dict):
         return False
     partes = [str(handler.get("command", ""))] + [str(a) for a in handler.get("args") or []]
-    return any(p.endswith(MARCA) or (MARCA + '"') in p or (MARCA + " ") in p for p in partes)
+    partes = [unicodedata.normalize("NFC", p) for p in partes]
+    return any(p.endswith(n) or (n + '"') in p or (n + " ") in p for p in partes for n in NOMBRES)
 
 
 def quitar_hooks(settings):
@@ -548,6 +553,11 @@ def cmd_estado(args):
 
 
 def main():
+    for flujo in (sys.stdout, sys.stderr):  # consola de Windows sin UTF-8: no fallar por un emoji
+        try:
+            flujo.reconfigure(errors="replace")
+        except (AttributeError, ValueError):
+            pass
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     sub = p.add_subparsers(dest="comando")
     c = sub.add_parser("instalar", help="configura todo (lo que hace correrlo sin argumentos)")
