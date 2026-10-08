@@ -76,6 +76,8 @@ ENTRYPOINTS_PROPIOS_DE_LA_APP = ("claude-desktop",)
 UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.I)
 LARGO_TITULO = 80
 LOCK_VENCIDO_SEG = 300
+# Subirla cuando cambie el criterio para descartar chats: invalida descartados.json.
+VERSION_CACHE = 2
 
 
 # --- rutas -----------------------------------------------------------------
@@ -305,15 +307,19 @@ def texto_de_usuario(linea):
     if linea.get("type") != "user" or linea.get("isMeta") or linea.get("isSidechain"):
         return None
     contenido = (linea.get("message") or {}).get("content")
-    if isinstance(contenido, list):
-        textos = [c.get("text", "") for c in contenido if isinstance(c, dict) and c.get("type") == "text"]
-        contenido = "\n".join(textos)
-    if not isinstance(contenido, str):
+    if isinstance(contenido, str):
+        bloques = [contenido]
+    elif isinstance(contenido, list):
+        # VS Code antepone bloques de contexto (<ide_opened_file>, <browser_instruction>, ...):
+        # se evalúa cada bloque por separado y se toma el primero escrito por el usuario.
+        bloques = [c.get("text", "") for c in contenido if isinstance(c, dict) and c.get("type") == "text"]
+    else:
         return None
-    contenido = contenido.strip()
-    if not contenido or contenido.startswith("<") or contenido.startswith("Caveat:"):
-        return None
-    return contenido
+    for texto in bloques:
+        texto = texto.strip()
+        if texto and not texto.startswith("<") and not texto.startswith("Caveat:"):
+            return texto
+    return None
 
 
 def es_temporal(cwd):
@@ -419,11 +425,14 @@ def nueva_entrada(plantilla, cli_id, datos):
 
 
 def cargar_cache():
+    """Chats ya descartados. Si cambió la lógica (VERSION_CACHE), se vuelven a evaluar todos."""
     try:
         datos = leer_json(estado_dir() / "descartados.json")
-        return datos if isinstance(datos, dict) else {}
     except (OSError, ValueError):
         return {}
+    if not isinstance(datos, dict) or datos.get("_version") != VERSION_CACHE:
+        return {}
+    return datos
 
 
 def sincronizar(indice=None, simular=False, salida=print):
@@ -445,6 +454,8 @@ def sincronizar(indice=None, simular=False, salida=print):
         return 0
 
     cache, cache_cambio, nuevos = cargar_cache(), False, 0
+    if cache.get("_version") != VERSION_CACHE:
+        cache["_version"], cache_cambio = VERSION_CACHE, True
     for jsonl in sorted((config_dir() / "projects").glob("*/*.jsonl")):
         cli_id = jsonl.stem
         if not UUID_RE.fullmatch(cli_id):
