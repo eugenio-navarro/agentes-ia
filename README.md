@@ -42,5 +42,6 @@ Todos siguen [FILOSOFIA.md](FILOSOFIA.md). Cada proyecto puede ajustarla en su `
 | `hooks/` | Scripts automáticos: el guard que impone los límites de cada rol y el formateador del engineer |
 | `BITACORA.md` | Decisiones, limitaciones y fallas encontradas (lo mantiene la IA) |
 | `INSTALAR.md` | Instrucciones para que una IA instale el equipo |
+| `extras/chats_claude.py` | Opcional, aparte de la instalación: conserva los chats de Claude Code y los muestra en la app de escritorio. Uso en el encabezado del archivo |
 
 Para instalar en otra máquina o herramienta, pedile a tu IA: *"Instalá los agentes siguiendo INSTALAR.md"*.

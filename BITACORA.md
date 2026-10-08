@@ -32,6 +32,7 @@ registrala como `pendiente`.
 
 | Fecha | Agente | Qué pasó | Causa | Cambio | Estado |
 |---|---|---|---|---|---|
+| 2026-10-08 | — | Conservar los chats y mostrarlos en la app de escritorio | Pedido del usuario | `extras/chats_claude.py` independiente de la instalación: `cleanupPeriodDays` + importación al índice interno de la app (formato sin documentar; macOS/Linux sin probar) | resuelto |
 | 2026-10-08 | architect | Formato de respuesta al usuario por sección | Pedido del usuario | Reporte final: arquitectura extensa, implementación en bullets, tests en una línea si pasan | resuelto |
 | 2026-10-08 | — | README reducido a recordatorio de uso | Pedido del usuario | Instalación a `INSTALAR.md`; `ESTADO.md` integrado acá; guard sin modo debug | resuelto |
 | 2026-10-08 | todos | Se agregó una filosofía de trabajo común | Pedido del usuario | `FILOSOFIA.md` global (vía `~/.claude/CLAUDE.md`); el architect ofrece ajustarla por proyecto y registra decisiones en ADRs | resuelto |
