@@ -9,27 +9,19 @@ architect ──► tester escribe tests 🔴 ──► engineer implementa 🟢
 
 ## Guía de uso
 
-**Iniciar** (en la carpeta del proyecto):
-```
-claude --agent software-architect
-```
-
-- **Proyecto nuevo**: contale la idea y respondé sus preguntas (stack, ajustes a la filosofía). Arma la
-  base: git, estructura, tests, linter, README y `CLAUDE.md`.
-- **Proyecto existente**: pedí directamente la funcionalidad o el bug a corregir.
-- **Cómo pedir**: una funcionalidad por pedido. Decí el *qué* y el *para qué*, con criterios de
-  aceptación si los tenés.
-- **Qué recibís**: arquitectura (detallada), implementación (bullets) y tests (✅ o qué falló).
-- **Git**: el engineer commitea cada paso en local. Revisá con `git log` / `git show` y hacé el push vos.
-- **No lo uses** para cambios chicos (un texto, un rename): una sesión normal de `claude` es más rápida
-  y barata.
-
-| En la sesión | Para qué |
+| Comando | Qué hace |
 |---|---|
-| `Ctrl+O` | Ver el detalle de lo que hace cada agente |
-| `Esc` | Frenar si va mal encaminado |
-| `/clear` | Empezar una tarea nueva con contexto limpio |
-| `/cost` | Ver el consumo |
+| `claude --agent software-architect` | Inicia la sesión con el architect, que coordina al engineer y al tester |
+| `claude --agent software-engineer` | Inicia la sesión hablando directo con el engineer, sin architect |
+| `claude --agent software-tester` | Inicia la sesión hablando directo con el tester, sin architect |
+| `claude -c` | Retoma la última sesión de la carpeta, con el mismo agente |
+| `claude -r` | Muestra las sesiones anteriores para elegir cuál retomar, con su agente |
+| `@agent-software-engineer <tarea>` | Dentro de la sesión, obliga a que esa tarea la haga el engineer |
+| `@agent-software-tester <tarea>` | Dentro de la sesión, obliga a que esa tarea la haga el tester |
+| `/tasks` | Lista los subagentes en curso; `Enter` abre lo que está haciendo uno |
+| `x` (en `/tasks`) | Detiene el subagente seleccionado |
+| `Ctrl+B` | Pasa la tarea en curso a segundo plano |
+| `Esc` | Interrumpe al agente |
 
 ## El equipo
 
