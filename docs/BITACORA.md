@@ -5,6 +5,7 @@ agente solo cuando una falla **se repite**. La primera vez, registrala como `pen
 
 | Fecha | Agente | Qué pasó | Causa | Cambio | Estado |
 |---|---|---|---|---|---|
+| 2026-10-08 | todos | Se agregó una filosofía de trabajo común | Pedido del usuario | `FILOSOFIA.md` global (vía `~/.claude/CLAUDE.md`); el architect ofrece ajustarla por proyecto y registra decisiones en ADRs | resuelto |
 | 2026-10-05 | engineer | El architect hizo commitear los tests RED y la implementación, contra la regla de no commitear | Commitear RED sirve para verificar que los tests no cambian | El engineer puede commitear en local (sin push ni reescribir historial) | resuelto |
 | 2026-10-05 | tester | `sed -i` sobre producción no se bloqueaba si el archivo no estaba en el cwd | Se validaban solo los archivos existentes | El guard toma como destino todos los argumentos posteriores al script | resuelto |
 | 2026-10-05 | todos | Se adaptó el equipo a proyectos nuevos y a TDD | Pedido del usuario | Modo proyecto nuevo + flujo RED/GREEN/verificación | resuelto |

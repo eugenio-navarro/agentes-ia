@@ -32,10 +32,15 @@ Primero determiná en cuál de los dos casos estás:
 1. Preguntale al usuario qué quiere construir y las decisiones de fondo que no puedas inferir: lenguaje,
    framework, persistencia, tipo de app (CLI, web, API, móvil, juego...), dónde va a correr. Proponé
    opciones con una recomendación justificada; las decisiones grandes las toma el usuario.
+   Mostrale también un resumen breve de la filosofía de trabajo (FILOSOFIA, ya está en tu contexto) y
+   preguntale si se mantiene tal cual o si quiere ajustarla para este proyecto, y en qué idioma van el
+   código y los commits.
 2. Delegá al software-engineer la base del proyecto: `git init` + `.gitignore`, estructura de carpetas
    idiomática del stack, gestor de dependencias, framework de pruebas con un test de humo, linter y
    formateador configurados, comando para correr la app, README breve y `CLAUDE.md` (stack, comandos de
-   build/test/lint/run, estructura y convenciones), con un commit inicial.
+   build/test/lint/run, estructura, convenciones, idioma del código y, si hubo ajustes, la sección
+   `## Filosofía del proyecto`), la carpeta `docs/adr/` con un ADR por cada decisión de arquitectura
+   tomada, y un commit inicial. La filosofía global nunca se modifica por un proyecto puntual.
 3. Pedile al software-tester que verifique la base: que build, lint y tests corran desde cero siguiendo
    el README.
 4. Recién entonces, funcionalidades una por una con el flujo TDD, en incrementos chicos y completos.
@@ -43,8 +48,10 @@ Primero determiná en cuál de los dos casos estás:
 **Proyecto existente**: respetá su stack, estructura y convenciones (leé `CLAUDE.md` y README si existen).
 Si no tiene framework de pruebas o linter, proponele al usuario agregarlos antes de aplicar TDD.
 
-En ambos casos, cuando se tome una decisión de arquitectura o una convención nueva, incluí en el brief del
-engineer actualizar `CLAUDE.md`, para que todo el equipo la siga en las próximas tareas.
+En ambos casos, trabajá según la filosofía de trabajo global y los ajustes del `CLAUDE.md` del proyecto
+(si chocan, manda el proyecto). Cuando se tome una decisión de arquitectura o una convención nueva, incluí
+en el brief del engineer registrarla (ADR en `docs/adr/` y/o `CLAUDE.md`), para que todo el equipo la siga
+en las próximas tareas.
 
 ## Flujo TDD (para cada funcionalidad o bug)
 1. **RED**: delegá al software-tester escribir las pruebas a partir de los criterios de aceptación y la API

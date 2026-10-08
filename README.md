@@ -19,6 +19,7 @@ architect ──► tester: tests (🔴) ──► engineer: implementa (🟢) �
 ## Contenido
 
 ```
+FILOSOFIA.md  filosofía de trabajo común a todas las sesiones y agentes
 agents/   1 archivo por agente: configuración genérica (frontmatter) + prompt (cuerpo)
 hooks/    agent_guard.py (límites de cada rol), format_on_edit.py (formato + lint) y sus tests
 docs/     ESTADO.md (contexto actual) y BITACORA.md (fallas y cambios)
@@ -31,8 +32,11 @@ cd mi-proyecto
 claude --agent software-architect      # o el equivalente en tu herramienta
 ```
 
-- **Proyecto nuevo**: contale la idea, respondé sus preguntas de stack y dejá que arme la base
-  (git, estructura, tests, linter, README, `CLAUDE.md`). Después pedí funcionalidades de a una.
+- **Proyecto nuevo**: contale la idea, respondé sus preguntas de stack y si querés ajustar la
+  filosofía para ese proyecto, y dejá que arme la base (git, estructura, tests, linter, README,
+  `CLAUDE.md`, ADRs). Después pedí funcionalidades de a una.
+- **Filosofía**: `FILOSOFIA.md` es global. Los ajustes de un proyecto van a la sección
+  `## Filosofía del proyecto` de su `CLAUDE.md` y mandan sobre la global.
 - **Proyecto existente**: pedí directamente la funcionalidad o el bug a corregir.
 - Pedí el *qué* y el *para qué*, con criterios de aceptación si los tenés.
 - El engineer commitea cada paso en local (tests RED, implementación); nunca hace push. Revisá con
@@ -50,7 +54,8 @@ Si sos una IA y el usuario te pidió instalar estos agentes:
    salvo nombres de herramientas propios de Claude Code que en tu entorno se llamen distinto.
 3. Traducí el **frontmatter** con las tablas de abajo. Instalá a nivel **global** (para todos los
    proyectos del usuario), no dentro de un proyecto.
-4. Copiá `hooks/` a la carpeta de configuración de la herramienta y usá **rutas absolutas** de esa
+4. Instalá `FILOSOFIA.md` como instrucciones **globales** de la herramienta, sin borrar las que ya
+   existan. Copiá `hooks/` a la carpeta de configuración de la herramienta y usá **rutas absolutas** de esa
    máquina en los comandos de los hooks.
 5. Si ya existen archivos con el mismo nombre, mostrale al usuario las diferencias y preguntá antes
    de sobrescribir. No toques API keys ni otras configuraciones.
@@ -80,6 +85,8 @@ Requisitos: Python 3 en el PATH (hooks) y Node/npx (Playwright del tester).
 
 - Agentes en `~/.claude/agents/<name>.md` y hooks en `~/.claude/hooks/`. Requiere Claude Code
   ≥ 2.1.280 para los modelos actuales (`claude update`).
+- Filosofía: copiá `FILOSOFIA.md` a `~/.claude/` y agregá la línea `@~/.claude/FILOSOFIA.md` a
+  `~/.claude/CLAUDE.md` (creala si no existe). La leen todas las sesiones y los subagentes.
 - `model`: alto → `opus`, medio → `sonnet`, liviano → `haiku`.
 - `tools` → `tools:`, agregando siempre `ToolSearch`:
   `read` → `Read, Glob, Grep` · `edit` → `Edit, Write, NotebookEdit` · `lsp` → `LSP` ·
@@ -100,6 +107,7 @@ Requisitos: Python 3 en el PATH (hooks) y Node/npx (Playwright del tester).
 ### OpenCode
 
 - Agentes en `~/.config/opencode/agents/<name>.md` (el nombre del agente es el nombre del archivo).
+- Filosofía: en las reglas globales (`~/.config/opencode/AGENTS.md`).
 - `mode`: principal → `primary`, subagente → `subagent`. `model` con formato `proveedor/modelo`
   (listalos con `opencode models`).
 - Los hooks de Claude Code no aplican: traducí `guard` a `permission`. Architect: `edit: deny`,
@@ -109,5 +117,6 @@ Requisitos: Python 3 en el PATH (hooks) y Node/npx (Playwright del tester).
 ### Copilot CLI
 
 - Agentes en `~/.copilot/agents/<name>.agent.md`.
+- Filosofía: en las instrucciones personalizadas globales (verificá la ruta en la documentación de tu versión).
 - `tools`: `read`, `search`, `edit`, `execute`, `agent`. El architect no lleva `edit` ni `execute`.
 - Sin hooks: los límites del tester dependen de su prompt; avisale al usuario.

@@ -1,6 +1,6 @@
 # Estado actual
 
-**Versión 1.1 · 2026-10-05**
+**Versión 1.2 · 2026-10-08**
 
 Este es el contexto vigente del equipo. Actualizalo cada vez que cambie un agente; el detalle de cada
 cambio va en [BITACORA.md](BITACORA.md).
@@ -16,10 +16,17 @@ cambio va en [BITACORA.md](BITACORA.md).
 | Git | Solo lectura | Commits locales, sin push ni reescritura | Sin commits |
 | Extras | Memoria entre proyectos, prompt inicial, delega solo a engineer/tester | Formato + lint al editar | Playwright (navegador real) |
 
+## Filosofía
+
+[FILOSOFIA.md](../FILOSOFIA.md) define cómo se trabaja: problema → modelo → diseño → lenguaje, reglas en el
+dominio, datos y seguridad desde el día uno, TDD y nadie aprueba su propio trabajo. Se instala como
+instrucciones globales: la siguen todas las sesiones y los 3 agentes. Cada proyecto puede ajustarla en la
+sección `## Filosofía del proyecto` de su `CLAUDE.md`; el architect lo pregunta al iniciar un proyecto nuevo.
+
 ## Flujo
 
-- **Proyecto nuevo**: el architect pregunta el stack, el engineer arma la base (git, estructura,
-  tests, linter, README, `CLAUDE.md`), el tester verifica la base y después se trabaja por
+- **Proyecto nuevo**: el architect pregunta el stack y si se ajusta la filosofía, el engineer arma la
+  base (git, estructura, tests, linter, README, `CLAUDE.md`, ADRs), el tester verifica la base y después se trabaja por
   funcionalidades.
 - **Cada funcionalidad o bug (TDD)**: el tester escribe los tests (🔴), el engineer implementa y
   refactoriza (🟢) sin tocar esos tests, y el tester verifica de forma independiente (✅).
