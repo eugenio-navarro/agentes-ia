@@ -3,9 +3,14 @@
 Archivo independiente: no lo usa la instalación de los agentes. Requiere Python 3.8+ y solo usa
 la biblioteca estándar. Los paths se calculan en cada PC (respeta CLAUDE_CONFIG_DIR).
 
-Comandos (todos combinan con lo que ya haya en ~/.claude/settings.json y guardan una copia
+Uso: `python chats_claude.py` (sin argumentos) lo deja todo configurado de una vez: conserva los
+chats, activa la sincronización automática e importa los chats existentes. Se puede volver a correr
+sin riesgo. Solo hace falta repetirlo si movés este archivo o cambiás de Python.
+
+Comandos sueltos (todos combinan con lo que ya haya en ~/.claude/settings.json y guardan una copia
 settings.json.bak-<fecha> antes de modificarlo):
 
+    python chats_claude.py instalar [--dias N]    Lo mismo que correrlo sin argumentos.
     python chats_claude.py conservar [--dias N]   Fija cleanupPeriodDays (por defecto 3650) para
                                                   que Claude Code no borre los chats a los 30 días.
                                                   Si ya hay un valor mayor, lo deja.
@@ -493,6 +498,19 @@ def cmd_sincronizar(args):
         sincronizar(args.indice, simular=args.simular)
 
 
+def cmd_instalar(args):
+    print("1/3 Conservar los chats")
+    cmd_conservar(args)
+    print("2/3 Sincronización automática")
+    cmd_activar(args)
+    print("3/3 Importar los chats existentes")
+    with Lock() as lock:
+        if lock.tomado:
+            sincronizar()
+        else:
+            print("Otra sincronización está en curso; los chats se importan en la próxima sesión.")
+
+
 def cmd_deshacer(args):
     creados = [e for e in leer_registro() if e.get("evento") == "creado"]
     existentes = [Path(e["indice"]) / e["archivo"] for e in creados
@@ -532,7 +550,11 @@ def cmd_estado(args):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    sub = p.add_subparsers(dest="comando", required=True)
+    sub = p.add_subparsers(dest="comando")
+    c = sub.add_parser("instalar", help="configura todo (lo que hace correrlo sin argumentos)")
+    c.add_argument("--dias", type=int, default=DIAS_POR_DEFECTO)
+    c.add_argument("--forzar", action="store_true", help="permite bajar un valor mayor")
+    c.set_defaults(func=cmd_instalar)
     c = sub.add_parser("conservar", help="fija cleanupPeriodDays")
     c.add_argument("--dias", type=int, default=DIAS_POR_DEFECTO)
     c.add_argument("--forzar", action="store_true", help="permite bajar un valor mayor")
@@ -550,7 +572,7 @@ def main():
     c = sub.add_parser("estado", help="muestra la configuración")
     c.add_argument("--indice")
     c.set_defaults(func=cmd_estado)
-    args = p.parse_args()
+    args = p.parse_args(sys.argv[1:] or ["instalar"])
     args.func(args)
 
 
