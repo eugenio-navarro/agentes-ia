@@ -1,122 +1,54 @@
 # agentes-ia
 
-Equipo de 3 agentes de IA para desarrollar software con **TDD**, en proyectos nuevos o existentes.
-La definición es independiente de la herramienta: la IA que lo instala la adapta a su entorno
-(Claude Code, OpenCode, Copilot CLI, etc.).
+Equipo de 3 agentes de IA que desarrolla software con **TDD**, en proyectos nuevos o existentes.
+Hablás solo con el architect; él coordina al resto.
 
 ```
-architect ──► tester: tests (🔴) ──► engineer: implementa (🟢) ──► tester: verifica (✅)
-    ▲                                                                    │
-    └──────────────────────── resultado / fallas ◄───────────────────────┘
+architect ──► tester escribe tests 🔴 ──► engineer implementa 🟢 ──► tester verifica ✅
 ```
 
-| Agente | Rol | Modelo |
-|---|---|---|
-| `software-architect` | Planifica, decide y delega. No escribe código. | alto |
-| `software-engineer` | Implementa una tarea o arma la base de un proyecto nuevo. | medio |
-| `software-tester` | Escribe los tests antes de implementar y verifica después. No toca producción. | liviano |
+## Guía de uso
 
-## Contenido
-
+**Iniciar** (en la carpeta del proyecto):
 ```
-FILOSOFIA.md  filosofía de trabajo común a todas las sesiones y agentes
-agents/   1 archivo por agente: configuración genérica (frontmatter) + prompt (cuerpo)
-hooks/    agent_guard.py (límites de cada rol), format_on_edit.py (formato + lint) y sus tests
-docs/     ESTADO.md (contexto actual) y BITACORA.md (fallas y cambios)
+claude --agent software-architect
 ```
 
-## Uso
-
-```
-cd mi-proyecto
-claude --agent software-architect      # o el equivalente en tu herramienta
-```
-
-- **Proyecto nuevo**: contale la idea, respondé sus preguntas de stack y si querés ajustar la
-  filosofía para ese proyecto, y dejá que arme la base (git, estructura, tests, linter, README,
-  `CLAUDE.md`, ADRs). Después pedí funcionalidades de a una.
-- **Filosofía**: `FILOSOFIA.md` es global. Los ajustes de un proyecto van a la sección
-  `## Filosofía del proyecto` de su `CLAUDE.md` y mandan sobre la global.
+- **Proyecto nuevo**: contale la idea y respondé sus preguntas (stack, ajustes a la filosofía). Arma la
+  base: git, estructura, tests, linter, README y `CLAUDE.md`.
 - **Proyecto existente**: pedí directamente la funcionalidad o el bug a corregir.
-- Pedí el *qué* y el *para qué*, con criterios de aceptación si los tenés.
-- El engineer commitea cada paso en local (tests RED, implementación); nunca hace push. Revisá con
-  `git log` / `git show` y publicá vos (`git push`).
-- Para cambios chicos (un texto, un rename) no hace falta el equipo: usá una sesión normal.
+- **Cómo pedir**: una funcionalidad por pedido. Decí el *qué* y el *para qué*, con criterios de
+  aceptación si los tenés.
+- **Qué recibís**: arquitectura (detallada), implementación (bullets) y tests (✅ o qué falló).
+- **Git**: el engineer commitea cada paso en local. Revisá con `git log` / `git show` y hacé el push vos.
+- **No lo uses** para cambios chicos (un texto, un rename): una sesión normal de `claude` es más rápida
+  y barata.
 
----
-
-## Instalación (instrucciones para la IA que configura este repo)
-
-Si sos una IA y el usuario te pidió instalar estos agentes:
-
-1. Detectá tu herramienta, su versión y el sistema operativo. Usá solo la sección que corresponda.
-2. Leé `agents/*.md` y `hooks/`. El **cuerpo** de cada agente es el prompt: copialo sin cambios,
-   salvo nombres de herramientas propios de Claude Code que en tu entorno se llamen distinto.
-3. Traducí el **frontmatter** con las tablas de abajo. Instalá a nivel **global** (para todos los
-   proyectos del usuario), no dentro de un proyecto.
-4. Instalá `FILOSOFIA.md` como instrucciones **globales** de la herramienta, sin borrar las que ya
-   existan. Copiá `hooks/` a la carpeta de configuración de la herramienta y usá **rutas absolutas** de esa
-   máquina en los comandos de los hooks.
-5. Si ya existen archivos con el mismo nombre, mostrale al usuario las diferencias y preguntá antes
-   de sobrescribir. No toques API keys ni otras configuraciones.
-6. Si tu herramienta no soporta algún campo (hooks, memoria, MCP...), omitilo y decile al usuario
-   qué capacidad o protección se pierde.
-7. Verificá: `python -m unittest discover hooks` pasa, la herramienta lista los 3 agentes y cada uno
-   carga con el modelo esperado. Al final, listá lo instalado y explicá cómo iniciar el architect.
-
-Requisitos: Python 3 en el PATH (hooks) y Node/npx (Playwright del tester).
-
-### Campos genéricos
-
-| Campo | Significado |
+| En la sesión | Para qué |
 |---|---|
-| `mode` | `principal`: se inicia como agente de la sesión. `subagente`: lo invoca el architect. |
-| `model` | `alto` (razonamiento fuerte), `medio` (código, costo medio), `liviano` (barato). Usá el alias más reciente de cada nivel. |
-| `effort` | Nivel de razonamiento, si la herramienta lo soporta. |
-| `tools` | Capacidades: `read` (leer/buscar), `edit`, `lsp`, `shell`, `web`, `todo`, `ask-user`, `delegate`, `skills`, `browser`. |
-| `delegates` | Únicos subagentes que puede invocar. |
-| `memory` | Memoria persistente del agente (`user` = compartida entre proyectos). |
-| `guard` | Hook *antes* de cada herramienta: `python hooks/agent_guard.py <rol>`. |
-| `post-edit` | Hook *después* de editar: `python hooks/format_on_edit.py`. |
-| `mcp` | Servidores MCP propios del agente. |
-| `initial-prompt` | Primer mensaje automático al iniciar el agente principal. |
+| `Ctrl+O` | Ver el detalle de lo que hace cada agente |
+| `Esc` | Frenar si va mal encaminado |
+| `/clear` | Empezar una tarea nueva con contexto limpio |
+| `/cost` | Ver el consumo |
 
-### Claude Code
+## El equipo
 
-- Agentes en `~/.claude/agents/<name>.md` y hooks en `~/.claude/hooks/`. Requiere Claude Code
-  ≥ 2.1.280 para los modelos actuales (`claude update`).
-- Filosofía: copiá `FILOSOFIA.md` a `~/.claude/` y agregá la línea `@~/.claude/FILOSOFIA.md` a
-  `~/.claude/CLAUDE.md` (creala si no existe). La leen todas las sesiones y los subagentes.
-- `model`: alto → `opus`, medio → `sonnet`, liviano → `haiku`.
-- `tools` → `tools:`, agregando siempre `ToolSearch`:
-  `read` → `Read, Glob, Grep` · `edit` → `Edit, Write, NotebookEdit` · `lsp` → `LSP` ·
-  `shell` → `Bash, PowerShell` · `web` → `WebFetch, WebSearch` · `todo` → `TodoWrite` ·
-  `ask-user` → `AskUserQuestion` · `delegate` → `Agent(<delegates separados por coma>), SendMessage` ·
-  `skills` → `Skill` · `browser` → `mcp__playwright__*`.
-- `guard: <rol>` → `hooks.PreToolUse` con matcher `"Bash|PowerShell|Edit|Write|NotebookEdit"` y
-  `command: python "<ruta absoluta>/agent_guard.py" <rol>`.
-- `post-edit` → `hooks.PostToolUse` con matcher `"Edit|Write"` y
-  `command: python "<ruta absoluta>/format_on_edit.py"`.
-- `mcp` → `mcpServers: [{playwright: {type: stdio, command: npx, args: ["-y", "@playwright/mcp@latest"]}}]`.
-- `memory`, `effort` y `color` se copian igual; `initial-prompt` → `initialPrompt`.
-- `mode: principal` se inicia con `claude --agent software-architect`.
-- Opcional, LSP por lenguaje: `claude plugin install <lenguaje>-lsp@claude-plugins-official`, más su
-  servidor (por ejemplo, Python: `npm i -g pyright` + `pyright-lsp`).
-- Los hooks leen el JSON de hooks de Claude Code y usan `agent_type` para aplicarse solo a su agente.
+| Agente | Hace | No puede | Modelo |
+|---|---|---|---|
+| **architect** | Entiende el pedido, decide la arquitectura, delega y valida | Editar código | Opus |
+| **engineer** | Implementa hasta que los tests pasen y commitea | Modificar los tests del tester, hacer push | Sonnet |
+| **tester** | Escribe los tests antes del código y verifica después | Tocar código de producción, commitear | Haiku |
 
-### OpenCode
+Todos siguen [FILOSOFIA.md](FILOSOFIA.md). Cada proyecto puede ajustarla en su `CLAUDE.md`.
 
-- Agentes en `~/.config/opencode/agents/<name>.md` (el nombre del agente es el nombre del archivo).
-- Filosofía: en las reglas globales (`~/.config/opencode/AGENTS.md`).
-- `mode`: principal → `primary`, subagente → `subagent`. `model` con formato `proveedor/modelo`
-  (listalos con `opencode models`).
-- Los hooks de Claude Code no aplican: traducí `guard` a `permission`. Architect: `edit: deny`,
-  `bash` con `"*": deny` más `allow` para los comandos de lectura (`git status*`, `git diff*`,
-  `git log*`, `ls*`...), y `task: allow`. Tester: `edit: ask` (o un plugin equivalente al guard).
+## Estructura
 
-### Copilot CLI
+| Archivo | Qué es |
+|---|---|
+| `FILOSOFIA.md` | Cómo se trabaja: principios, diseño, calidad y seguridad |
+| `agents/` | Un archivo por agente: configuración (modelo, permisos) + prompt |
+| `hooks/` | Scripts automáticos: el guard que impone los límites de cada rol y el formateador del engineer |
+| `BITACORA.md` | Decisiones, limitaciones y fallas encontradas (lo mantiene la IA) |
+| `INSTALAR.md` | Instrucciones para que una IA instale el equipo |
 
-- Agentes en `~/.copilot/agents/<name>.agent.md`.
-- Filosofía: en las instrucciones personalizadas globales (verificá la ruta en la documentación de tu versión).
-- `tools`: `read`, `search`, `edit`, `execute`, `agent`. El architect no lleva `edit` ni `execute`.
-- Sin hooks: los límites del tester dependen de su prompt; avisale al usuario.
+Para instalar en otra máquina o herramienta, pedile a tu IA: *"Instalá los agentes siguiendo INSTALAR.md"*.

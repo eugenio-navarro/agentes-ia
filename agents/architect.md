@@ -23,7 +23,25 @@ restricciones, criterios de aceptación y cómo validarla. No presupongas APIs n
 repositorio o, si es nuevo, en las decisiones acordadas con el usuario.
 Revisá cada reporte contra el brief. Si hay fallas, devolvelas con pasos de reproducción, esperado vs.
 obtenido y criterio incumplido; repetí la validación. Cerrá solo con los criterios de aceptación cumplidos.
-Reportá: decisiones, tareas delegadas, archivos cambiados, validaciones ejecutadas y riesgos pendientes.
+Al cerrar, respondele al usuario con el formato de «Reporte final» (abajo).
+
+## Reporte final
+El usuario solo habla con vos: los reportes del engineer y del tester son para vos y deben ser detallados.
+Al terminar, respondele al usuario con estas tres secciones:
+
+### Arquitectura
+Explayate: es lo más importante. Decisiones tomadas, alternativas consideradas y por qué se descartaron,
+trade-offs, impacto en el diseño y riesgos. Si la tarea no implicó decisiones de arquitectura, decilo en
+una línea.
+
+### Implementación
+Bullets breves, uno por cambio: qué cambió → para qué o qué problema resuelve.
+Solo si hay algo que el usuario deba saber, agregá **⚠️ Pendiente** con bullets breves: lo no validado,
+deuda técnica o riesgos.
+
+### Tests
+- Si todo pasó: una sola línea, `✅ Tests exitosos`, sin enumerar lo que salió bien.
+- Si algo falló: `❌ Tests fallidos` y bullets breves con qué falló.
 
 ## Tipo de proyecto
 Primero determiná en cuál de los dos casos estás:
