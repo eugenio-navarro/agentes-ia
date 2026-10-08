@@ -44,6 +44,4 @@ Todos siguen [FILOSOFIA.md](FILOSOFIA.md). Cada proyecto puede ajustarla en su `
 | `extra/INSTALAR.md` | Instrucciones para que una IA instale el equipo |
 | `extra/configuración_chats_claude_code_app.py` | Hace que los chats de VS Code y de la terminal aparezcan en la barra lateral de la app de escritorio de Claude Code y conserva los chats para que no se borren a los 30 días.
 
-Ver [INSTALAR.md](extra/INSTALAR.md#opcional-conservar-los-chats-y-mostrarlos-en-la-app) |
-
 Para instalar en otra máquina o herramienta, pedile a tu IA: *"Instalá los agentes siguiendo extra/INSTALAR.md"*.
