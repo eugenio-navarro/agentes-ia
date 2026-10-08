@@ -84,14 +84,15 @@ Módulo aparte de los agentes, solo para Claude Code. Instalalo únicamente si e
   y muestra en la app de escritorio (pestaña Code) los chats iniciados en la terminal y en VS Code.
   Para eso agrega hooks globales `SessionStart`/`SessionEnd` en `~/.claude/settings.json`, combinados
   con lo que ya haya.
-- **Instalar:** copiá `configuración_chats_claude_code_app.py` a `~/.claude/chats-claude/` y ejecutalo
-  desde ahí. Nunca lo ejecutes desde el clon del repo: los hooks guardan la ruta absoluta del archivo.
+- **Instalar:** copiá `extra/configuración_chats_claude_code_app.py` a `~/.claude/chats-claude/` y
+  ejecutalo desde ahí. Nunca lo ejecutes desde el clon del repo: los hooks guardan la ruta absoluta
+  del archivo.
 
   Windows (PowerShell, desde la raíz del repo):
 
   ```powershell
   New-Item -ItemType Directory -Force "$HOME\.claude\chats-claude" | Out-Null
-  Copy-Item configuración_chats_claude_code_app.py "$HOME\.claude\chats-claude\"
+  Copy-Item extra\configuración_chats_claude_code_app.py "$HOME\.claude\chats-claude\"
   python "$HOME\.claude\chats-claude\configuración_chats_claude_code_app.py"
   ```
 
@@ -99,7 +100,7 @@ Módulo aparte de los agentes, solo para Claude Code. Instalalo únicamente si e
 
   ```bash
   mkdir -p ~/.claude/chats-claude
-  cp configuración_chats_claude_code_app.py ~/.claude/chats-claude/
+  cp extra/configuración_chats_claude_code_app.py ~/.claude/chats-claude/
   python3 ~/.claude/chats-claude/configuración_chats_claude_code_app.py
   ```
 

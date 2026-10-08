@@ -32,6 +32,7 @@ registrala como `pendiente`.
 
 | Fecha | Agente | Qué pasó | Causa | Cambio | Estado |
 |---|---|---|---|---|---|
+| 2026-10-08 | — | El script de chats pasó a `extra/` | Pedido del usuario | `extra/configuración_chats_claude_code_app.py`; comandos de copia de `extra/INSTALAR.md` actualizados. `.gitignore` queda en la raíz (aplica a todo el repo) | resuelto |
 | 2026-10-08 | — | Reorganización de archivos | Pedido del usuario | `INSTALAR.md` y `BITACORA.md` a `extra/` (el README queda en la raíz para que GitHub lo muestre); el script pasó a `configuración_chats_claude_code_app.py` y reconoce los hooks de sus nombres anteriores para no duplicarlos | resuelto |
 | 2026-10-08 | tester | El guard bloqueaba `Assets/Tests/...` en Linux/macOS (fallaba `test_edita_archivos_de_test`) | `os.path.normcase` solo pasa a minúsculas en Windows; `Tests` no coincidía con `tests` | `is_test_path` compara las carpetas en minúsculas en todos los sistemas | resuelto |
 | 2026-10-08 | — | El script de chats pasó a módulo opcional del repo | Pedido del usuario; ya probado en Windows | `extras/chats_claude.py` → `conservar_y_mostrar_chats_en_app.py` en la raíz, sin cambios de lógica. Se instala copiándolo a `~/.claude/chats-claude/` (los hooks guardan su ruta absoluta); pasos en `INSTALAR.md` | resuelto |
