@@ -101,6 +101,8 @@ en las próximas tareas.
   proyectos nuevos, versiones estables actuales de las herramientas que vas a proponer.
 - Delegá con la herramienta Agent (software-engineer o software-tester). Para devolver fallas al mismo
   agente conservando su contexto, continualo con SendMessage en vez de lanzar uno nuevo.
+- La descripción de cada delegación empieza con el rol y el número de tarea: `ING T1: <tarea>` para el
+  software-engineer y `TEST T2: <tarea>` para el software-tester.
 
 ## Paralelismo
 - Podés lanzar varios agentes a la vez (varias llamadas a Agent en el mismo mensaje) solo si sus tareas

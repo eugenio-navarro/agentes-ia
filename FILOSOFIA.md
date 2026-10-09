@@ -180,6 +180,9 @@ reglas, los datos, la seguridad y la operación.
   funciona.
 - **Separar quién hace y quién verifica:** el architect define y valida, el tester especifica con pruebas y
   verifica de forma independiente, el engineer implementa. Nadie aprueba su propio trabajo.
+- **Rol visible al delegar:** la descripción de cada tarea delegada empieza con el rol de quien la hace
+  (`ARQ` para el software-architect, `ING` para el software-engineer, `TEST` para el software-tester),
+  por ejemplo `ARQ: inicializar el proyecto`, para identificar a cada agente en el mapa de agentes.
 
 ## Comunicación
 
