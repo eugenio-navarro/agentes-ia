@@ -32,6 +32,7 @@ registrala como `pendiente`.
 
 | Fecha | Agente | Qué pasó | Causa | Cambio | Estado |
 |---|---|---|---|---|---|
+| 2026-10-09 | todos | La instalación en Claude Code se hacía a mano y podía quedar desactualizada (el `agent_guard.py` instalado no tenía la corrección del 2026-10-08) | La traducción la hacía una IA en cada máquina | `extra/instalar_claude_code.py` (con tests): traduce según `INSTALAR.md`, copia hooks y filosofía, respalda lo que reemplaza. Se corre a mano; el setup script de la nube también lo usa. En Linux omite PowerShell y usa `python3`; el tester recibe `NotebookEdit` (regla `edit` de `INSTALAR.md`) | resuelto |
 | 2026-10-09 | todos | En el mapa de agentes no se distinguía qué agente hacía cada tarea (`T1`, `T2`...) | La descripción de la delegación no indicaba el rol | `FILOSOFIA.md`: toda delegación empieza con `ARQ`, `ING` o `TEST`; architect: `ING T1: ...` / `TEST T2: ...` | resuelto |
 | 2026-10-08 | — | El script de chats pasó a `extra/` | Pedido del usuario | `extra/configuración_chats_claude_code_app.py`; comandos de copia de `extra/INSTALAR.md` actualizados. `.gitignore` queda en la raíz (aplica a todo el repo) | resuelto |
 | 2026-10-08 | — | Reorganización de archivos | Pedido del usuario | `INSTALAR.md` y `BITACORA.md` a `extra/` (el README queda en la raíz para que GitHub lo muestre); el script pasó a `configuración_chats_claude_code_app.py` y reconoce los hooks de sus nombres anteriores para no duplicarlos | resuelto |

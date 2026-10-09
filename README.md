@@ -42,6 +42,10 @@ Todos siguen [FILOSOFIA.md](FILOSOFIA.md). Cada proyecto puede ajustarla en su `
 | `hooks/` | Scripts automáticos: el guard que impone los límites de cada rol y el formateador del engineer |
 | `extra/BITACORA.md` | Decisiones, limitaciones y fallas encontradas (lo mantiene la IA) |
 | `extra/INSTALAR.md` | Instrucciones para que una IA instale el equipo |
+| `extra/instalar_claude_code.py` | Instala o actualiza el equipo en Claude Code (`~/.claude`) a partir del repo |
+| `extra/setup_nube.sh` | Setup script para usar el equipo en las sesiones en la nube de Claude Code |
 | `extra/configuración_chats_claude_code_app.py` | Hace que los chats de VS Code y de la terminal aparezcan en la barra lateral de la app de escritorio de Claude Code y conserva los chats para que no se borren a los 30 días.
 
-Para instalar en otra máquina o herramienta, pedile a tu IA: *"Instalá los agentes siguiendo extra/INSTALAR.md"*.
+Para instalar o actualizar en Claude Code, desde la raíz del repo: `git pull` y
+`python extra/instalar_claude_code.py` (detalles en `extra/INSTALAR.md`). Para otra herramienta,
+pedile a tu IA: *"Instalá los agentes siguiendo extra/INSTALAR.md"*.

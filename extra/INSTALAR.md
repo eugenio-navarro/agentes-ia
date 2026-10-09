@@ -38,6 +38,30 @@ Requisitos: Python 3 en el PATH (hooks) y Node/npx (Playwright del tester).
 
 ## Claude Code
 
+**Instalación y actualización automática** (Windows, macOS, Linux; Python 3.8+). Desde la raíz del repo:
+
+```
+git pull                                       # traer los últimos cambios
+python extra/instalar_claude_code.py --simular # ver qué cambiaría, sin escribir
+python extra/instalar_claude_code.py           # instalar o actualizar en ~/.claude
+python -m unittest discover extra              # tests del instalador
+```
+
+Aplica las reglas de abajo, regenera los agentes desde `agents/` (el repo es la fuente de verdad),
+copia `hooks/` y `FILOSOFIA.md`, agrega la línea de la filosofía a `~/.claude/CLAUDE.md` sin borrar lo
+que tenga, y guarda en `~/.claude/backups-agentes/<fecha>/` los archivos que reemplaza. No toca
+`settings.json`. Se corre a mano después de cada cambio: no se ejecuta solo. Los cambios aplican desde
+la próxima sesión.
+
+**Sesiones en la nube** (claude.ai/code): no ven `~/.claude` de tu PC. Pegá `extra/setup_nube.sh` en
+el campo **Setup script** del entorno: en cada sesión nueva clona este repo (tiene que ser público),
+corre el instalador y hace que la sesión arranque como `software-architect` (así puede delegar; como
+subagente, en la nube no recibe la herramienta para lanzar a otros). La nube guarda una foto del entorno
+después de la primera ejecución: para que tome cambios de los agentes, subí el número de versión del
+script. Si falla, el log queda en `/root/setup-agentes.log`.
+
+Si una IA instala a mano, las reglas son estas:
+
 - Agentes en `~/.claude/agents/<name>.md` y hooks en `~/.claude/hooks/`. Requiere Claude Code
   ≥ 2.1.280 para los modelos actuales (`claude update`).
 - Filosofía: copiá `FILOSOFIA.md` a `~/.claude/` y agregá la línea `@~/.claude/FILOSOFIA.md` a
