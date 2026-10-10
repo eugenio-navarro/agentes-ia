@@ -55,15 +55,18 @@ la próxima sesión.
 
 En Windows, `extra/actualizar_agentes.cmd` hace los dos pasos (`git pull` + instalador) con doble clic
 y deja la ventana abierta para ver el resultado. Para lanzarlo desde el menú Inicio o la Paleta de
-comandos de PowerToys escribiendo "Actualizar agentes", creá un acceso directo a ese archivo en
-`%APPDATA%\Microsoft\Windows\Start Menu\Programs\` (el acceso directo guarda la ruta de esta
-máquina, por eso no está en el repo).
+comandos de PowerToys, creá un acceso directo a ese archivo en
+`%APPDATA%\Microsoft\Windows\Start Menu\Programs\Comandos\` con el nombre `_Actualizar agentes` (el acceso directo guarda la ruta de
+esta máquina, por eso no está en el repo). El prefijo `_` separa los comandos propios de las apps: en
+la paleta se escribe `_` para verlos. La paleta solo carga los accesos directos al arrancar, así que
+hay que reiniciarla (solo la paleta, no PowerToys) para que aparezca uno nuevo.
 
 `extra/reiniciar_claude.ps1` cierra la app de escritorio de Claude y la vuelve a abrir, para que la
 barra lateral cargue los chats importados (la app solo lee su índice al arrancar). Solo cierra la app
 y sus sesiones: no toca las de VS Code ni las de la terminal. Con la app cerrada sincroniza los chats
 pendientes y después la abre. Corta las sesiones que estén trabajando dentro de la app. Con
-`-Simular` muestra qué haría sin hacerlo. Para la paleta, el acceso directo apunta a `extra/reiniciar_claude.cmd`, que lanza el `.ps1`.
+`-Simular` muestra qué haría sin hacerlo. Para la paleta, el acceso directo
+`_Reiniciar Claude` apunta a `extra/reiniciar_claude.cmd`, que lanza el `.ps1`.
 A los accesos directos se les puede poner un ícono propio (Propiedades > Cambiar icono, un `.ico`).
 
 **Sesiones en la nube** (claude.ai/code): no ven `~/.claude` de tu PC. Pegá `extra/setup_nube.sh` en

@@ -1,4 +1,4 @@
 @echo off
-rem Lanza extra\reiniciar_claude.ps1 (cierra y reabre la app de Claude). Sirve como destino de un
-rem acceso directo: los lanzadores no siempre listan accesos que apuntan a powershell.exe.
+rem Lanza extra\reiniciar_claude.ps1 (cierra y reabre la app de Claude). Sirve como destino del
+rem acceso directo "_Reiniciar Claude", para lanzarlo con doble clic o desde la paleta de PowerToys.
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0reiniciar_claude.ps1" %*
