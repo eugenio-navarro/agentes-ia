@@ -63,8 +63,7 @@ máquina, por eso no está en el repo).
 barra lateral cargue los chats importados (la app solo lee su índice al arrancar). Solo cierra la app
 y sus sesiones: no toca las de VS Code ni las de la terminal. Con la app cerrada sincroniza los chats
 pendientes y después la abre. Corta las sesiones que estén trabajando dentro de la app. Con
-`-Simular` muestra qué haría sin hacerlo. Para la paleta, el acceso directo apunta a `powershell.exe`
-con los argumentos `-NoProfile -ExecutionPolicy Bypass -File "<repo>\extra\reiniciar_claude.ps1"`.
+`-Simular` muestra qué haría sin hacerlo. Para la paleta, el acceso directo apunta a `extra/reiniciar_claude.cmd`, que lanza el `.ps1`.
 A los accesos directos se les puede poner un ícono propio (Propiedades > Cambiar icono, un `.ico`).
 
 **Sesiones en la nube** (claude.ai/code): no ven `~/.claude` de tu PC. Pegá `extra/setup_nube.sh` en
