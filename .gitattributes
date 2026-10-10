@@ -1,3 +1,4 @@
-# Fin de línea fijo: los .cmd necesitan CRLF y los .sh LF, sin importar la configuración de Git.
+# Fin de línea fijo: los .cmd y .ps1 necesitan CRLF y los .sh LF, sin importar la configuración de Git.
 *.cmd text eol=crlf
 *.sh text eol=lf
+*.ps1 text eol=crlf
