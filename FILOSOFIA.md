@@ -133,6 +133,8 @@ reglas, los datos, la seguridad y la operación.
 - **Mínimo privilegio:** la base de datos nunca expuesta a internet; cada componente con solo los permisos
   que necesita.
 - **Secretos fuera del código y de Git** (variables de entorno o gestores de secretos).
+- **Un secreto encontrado no se copia:** se referencia por archivo y línea, nunca se pega completo en
+  reportes, comandos, logs ni prompts.
 - **Auditoría:** quién hizo qué y cuándo en las operaciones sensibles (dinero, autorizaciones, precios).
 - **Dependencias mínimas y actualizadas**, con alertas de vulnerabilidades.
 - **Datos personales:** se cumple la normativa aplicable (en Argentina, la Ley 25.326). En repos, tests,
