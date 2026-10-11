@@ -221,6 +221,8 @@ test('shows the recommended command itself, with Ignorar and no sentence', async
     expect(await buttonsOf(ui)).toEqual(['compact', 'ignore'])
     expect((await ui.find({ key: 'compact' }))?.props).toMatchObject({ label: '/compact', variant: 'primary' })
     expect((await ui.find({ key: 'ignore' }))?.props).toMatchObject({ label: 'Ignorar' })
+    const shortcuts = (await ui.findAll({ type: 'Button' })).map(button => button.props.hotkey)
+    expect(shortcuts, 'no shortcut numbers beside the buttons').toEqual([undefined, undefined])
     expect(await ui.find({ type: 'Text', text: 'Recomendado' })).toBe(undefined)
     await ui.unmount()
   }

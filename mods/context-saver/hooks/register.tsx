@@ -374,14 +374,12 @@ export const register: Register = on => {
             <Button
               key={command}
               label={`/${command}`}
-              hotkey="1"
               variant="primary"
               onPress={() => void (command === 'clear' ? clear($) : compact($))}
             />
             <Button
               key="ignore"
               label="Ignorar"
-              hotkey="0"
               onPress={() => void update($, signals, seen => ({ ...seen, hidden: kind }))}
             />
           </Box>
