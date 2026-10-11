@@ -454,6 +454,39 @@ test('/uso says what the detection itself spent', async ($, on) => {
   expect(ran.text).toContain('Detección de cambio de tema: 1 consulta, 302 tokens')
 })
 
+test("draws the /uso report in the transcript with the band's bars, a title per part and one row per figure", async ($, on) => {
+  worldOf(on, 20)
+  const text = [
+    'Contexto  ██████████░░░░░░░░░░  48% · 476k de 1M tokens',
+    '7 días    █████████████████░░░  85%',
+    'Precio de la sesión: $16.45',
+    '',
+    'Qué ocupa el contexto',
+    '• Conversación: 400k (85%)',
+  ].join('\n')
+
+  for (const surface of SURFACES) {
+    const ui = await $.ui.mount({
+      plugin: PLUGIN,
+      surface,
+      component: 'CommandOutput',
+      props: { command: 'uso', args: '', text, isErrored: false },
+    })
+    const bold = (await ui.findAll({ type: 'Text' })).filter(one => one.props.bold === true).map(one => one.text)
+    expect(bold).toEqual(expect.arrayContaining(['Uso', 'Qué ocupa el contexto', '48%', '85%', '$16.45']))
+
+    const bars = (await ui.findAll({ type: 'Svg' })).map(one => String(one.props.source))
+    expect(bars.length, 'vector bars only where the surface draws them').toBe(surface === 'terminal' ? 0 : 3)
+
+    if (surface !== 'terminal') {
+      expect(bars[0], 'context at 48%').toContain('#4ade80')
+      expect(bars[1], 'a window at 85%').toContain('#f87171')
+    }
+
+    await ui.unmount()
+  }
+})
+
 test('names the tool call that put a large output in the context', async ($, on) => {
   const world = worldOf(on, 20)
 

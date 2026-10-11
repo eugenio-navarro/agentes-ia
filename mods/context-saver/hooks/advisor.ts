@@ -1,6 +1,6 @@
 import type { SessionContextBreakdown, SessionRateLimit, SessionUsage } from 'claude-code'
 
-import type { AdviceKind, Cut, Figures, Gauge, Ledger, Pause, Signals } from '../types'
+import type { AdviceKind, Cut, Figures, Gauge, Ledger, Level, Pause, Signals } from '../types'
 
 /** Every threshold the mod decides by, written once. */
 export const LIMITS = {
@@ -34,6 +34,9 @@ export const LIMITS = {
   /** The size of a gauge's bar where the surface draws vectors, in CSS pixels. */
   barWidthPx: 56,
   barHeightPx: 8,
+  /** The bars of the /uso report: in pixels where drawn as vectors, in cells as text. */
+  reportBarPx: 120,
+  reportBarCells: 20,
 } as const
 
 export const COMPACT_INSTRUCTIONS =
@@ -340,7 +343,8 @@ export const shortCount = (count: number): string => {
     : `${String(Math.round(count / 100_000) / 10).replace('.', ',')}M`
 }
 
-const REPORT_BAR_CELLS = 20
+const REPORT_BAR_CELLS = LIMITS.reportBarCells
+const CONTEXT_TITLE = 'Qué ocupa el contexto'
 const REPORT_LABEL_WIDTH = 10
 const WINDOW_NAMES: Readonly<Record<string, string>> = { five_hour: '5 horas', seven_day: '7 días' }
 
@@ -393,6 +397,58 @@ const heaviestConnectors = (tools: Breakdown['mcpTools']): string[] => {
 
 const listed = (title: string, items: readonly string[]): string[] =>
   items.length === 0 ? [] : [`${title}: ${items.join(' · ')}`]
+
+/** The level a share of a limit is drawn at: the same thresholds the gauges use. */
+export const levelFor = (percent: number): Level =>
+  percent >= LIMITS.urgentAt ? 'danger' : percent >= LIMITS.compactAt ? 'warn' : 'ok'
+
+/** One line of the /uso report, as the transcript draws it. */
+export type ReportBlock =
+  | { kind: 'figure'; label: string; percent: number; detail: string | null }
+  | { kind: 'share'; label: string; percent: number; amount: string }
+  | { kind: 'fact'; label: string; value: string }
+  | { kind: 'title'; text: string }
+  | { kind: 'note'; text: string }
+
+const FIGURE_LINE = /^(.+?)\s+[█░]+\s+(\d+)%(?: · (.*))?$/
+const SHARE_LINE = /^• (.+): (\S+) \((\d+)%\)$/
+const FACT_LINE = /^([^:]+): (.+)$/
+
+/**
+ * Reads the report's own text back into what each line is, so the transcript can draw it
+ * with the band's bars and colours. The text stays the one thing the model and a surface
+ * without the drawing read; this only ever reads what `reportOf` writes.
+ */
+export const reportBlocks = (text: string): ReportBlock[] =>
+  text
+    .split('\n')
+    .filter(line => line.trim() !== '')
+    .map((line): ReportBlock => {
+      const figure = FIGURE_LINE.exec(line)
+
+      if (figure !== null) {
+        return {
+          kind: 'figure',
+          label: (figure[1] ?? '').trim(),
+          percent: Number(figure[2]),
+          detail: figure[3] ?? null,
+        }
+      }
+
+      const share = SHARE_LINE.exec(line)
+
+      if (share !== null) {
+        return { kind: 'share', label: share[1] ?? '', amount: share[2] ?? '', percent: Number(share[3]) }
+      }
+
+      const fact = FACT_LINE.exec(line)
+
+      if (fact !== null) {
+        return { kind: 'fact', label: fact[1] ?? '', value: fact[2] ?? '' }
+      }
+
+      return line === CONTEXT_TITLE ? { kind: 'title', text: line } : { kind: 'note', text: line }
+    })
 
 /**
  * The /uso report: a bar for the context and each usage window, the cost, what fills the
@@ -449,7 +505,7 @@ export const reportOf = (
         ]),
   ]
 
-  return [figures, groups.length === 0 ? [] : ['Qué ocupa el contexto', ...groups], spent]
+  return [figures, groups.length === 0 ? [] : [CONTEXT_TITLE, ...groups], spent]
     .filter(lines => lines.length > 0)
     .map(lines => lines.join('\n'))
     .join('\n\n')

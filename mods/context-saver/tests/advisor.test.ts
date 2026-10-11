@@ -12,6 +12,8 @@ import {
   filledCells,
   isWorthAsking,
   ledgerFrom,
+  levelFor,
+  reportBlocks,
   reportOf,
   resetIn,
   shortCount,
@@ -169,6 +171,37 @@ describe('windowsShown', () => {
       week,
     ])
     expect(windowsShown([], [week], AT + 3 * 60_000), 'no reset time known').toEqual([week])
+  })
+})
+
+describe('reportBlocks', () => {
+  test('reads the report back into what each line is', () => {
+    const text = [
+      'Contexto  ██████████░░░░░░░░░░  48% · 476k de 1M tokens',
+      '7 días    █████████████████░░░  85%',
+      'Precio de la sesión: $16.45',
+      '',
+      'Qué ocupa el contexto',
+      '• Instrucciones y memoria: 10k (2%)',
+      '',
+      'Conectores más pesados: browser 11k · gmail 1k',
+    ].join('\n')
+
+    expect(reportBlocks(text)).toEqual([
+      { kind: 'figure', label: 'Contexto', percent: 48, detail: '476k de 1M tokens' },
+      { kind: 'figure', label: '7 días', percent: 85, detail: null },
+      { kind: 'fact', label: 'Precio de la sesión', value: '$16.45' },
+      { kind: 'title', text: 'Qué ocupa el contexto' },
+      { kind: 'share', label: 'Instrucciones y memoria', amount: '10k', percent: 2 },
+      { kind: 'fact', label: 'Conectores más pesados', value: 'browser 11k · gmail 1k' },
+    ])
+  })
+
+  test('reads a report with no reading as a note, and colours a figure by the usual levels', () => {
+    expect(reportBlocks('Contexto  sin datos todavía')).toEqual([
+      { kind: 'note', text: 'Contexto  sin datos todavía' },
+    ])
+    expect([59, 60, 80].map(levelFor)).toEqual(['ok', 'warn', 'danger'])
   })
 })
 
@@ -416,5 +449,11 @@ describe('reportOf', () => {
     const text = reportOf({ startedAt: 0, context: { window: 200_000 }, rateLimits: [] }, undefined, QUIET, NOW)
 
     expect(text).toBe('Contexto  sin datos todavía')
+  })
+
+  test('writes only lines the transcript knows how to draw', () => {
+    const kinds = reportBlocks(reportOf(usage, breakdown, QUIET, NOW)).map(block => block.kind)
+
+    expect(kinds).toEqual(['figure', 'figure', 'figure', 'fact', 'title', 'share', 'share', 'share', 'share', 'fact'])
   })
 })

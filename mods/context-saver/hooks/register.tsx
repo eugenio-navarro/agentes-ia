@@ -22,6 +22,8 @@ import {
   isSubstantial,
   isWorthAsking,
   ledgerFrom,
+  levelFor,
+  reportBlocks,
   reportOf,
   signalsFrom,
   statusTextOf,
@@ -479,6 +481,80 @@ export const register: Register = on => {
             />
           </Box>
         )}
+      </Box>
+    )
+  })
+
+  // The /uso report, drawn in the transcript with the band's own bars and colours: a title
+  // per part, one row per figure. The text it is read from is what the model keeps.
+  on('ui.render', { component: 'CommandOutput', props: { command: 'uso' } }, ($, e, next) => {
+    if (e.props.isErrored) {
+      return next(e)
+    }
+
+    const { Box, Text } = $.ui.resolve(e)
+    const Svg = e.surface === 'terminal' ? null : $.ui.resolve(e).Svg
+
+    const bar = (percent: number, color: string) => {
+      const used = filledCells(percent, LIMITS.reportBarCells)
+
+      return Svg === null ? (
+        <Text>
+          {used > 0 && <Text color={color}>{'█'.repeat(used)}</Text>}
+          {used < LIMITS.reportBarCells && (
+            <Text color={TRACK}>{'█'.repeat(LIMITS.reportBarCells - used)}</Text>
+          )}
+        </Text>
+      ) : (
+        <Svg
+          source={barSvg(percent, color, TRACK, LIMITS.reportBarPx, LIMITS.barHeightPx)}
+          alt={`${percent}%`}
+          width={LIMITS.reportBarPx}
+          height={LIMITS.barHeightPx}
+        />
+      )
+    }
+
+    // A label in a column of its own width, so the bars of a part start at the same place.
+    const row = (label: string, labelCells: number, percent: number, color: string, detail: string | null) => (
+      <Box columnGap={1} alignItems="center">
+        <Box width={labelCells} flexShrink={0}>
+          <Text color={MUTED}>{label}</Text>
+        </Box>
+        {bar(percent, color)}
+        <Box width={5} flexShrink={0}>
+          <Text bold>{`${percent}%`}</Text>
+        </Box>
+        {detail !== null && <Text color={MUTED}>{detail}</Text>}
+      </Box>
+    )
+
+    return (
+      <Box flexDirection="column">
+        <Text bold>Uso</Text>
+        {reportBlocks(e.props.text).map(block => {
+          switch (block.kind) {
+            case 'figure':
+              return row(block.label, 10, block.percent, LEVEL_COLORS[levelFor(block.percent)], block.detail)
+            case 'share':
+              return row(block.label, 26, block.percent, MUTED, block.amount)
+            case 'fact':
+              return (
+                <Box columnGap={1}>
+                  <Text color={MUTED}>{block.label}</Text>
+                  <Text bold>{block.value}</Text>
+                </Box>
+              )
+            case 'title':
+              return (
+                <Box marginTop={1}>
+                  <Text bold>{block.text}</Text>
+                </Box>
+              )
+            case 'note':
+              return <Text color={MUTED}>{block.text}</Text>
+          }
+        })}
       </Box>
     )
   })
