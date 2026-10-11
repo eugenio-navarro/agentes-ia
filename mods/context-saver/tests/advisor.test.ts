@@ -11,9 +11,11 @@ import {
   figuresOf,
   filledCells,
   isWorthAsking,
+  ledgerFrom,
   reportOf,
   resetIn,
   shortCount,
+  signalsFrom,
   statusTextOf,
   topicAnswer,
   topicInstructions,
@@ -115,6 +117,28 @@ describe('a change of subject', () => {
   test('asks the compaction to keep only the new subject', () => {
     expect(topicInstructions(LONG)).toContain(LONG)
     expect(topicInstructions(LONG).startsWith('Cambio de tema')).toBe(true)
+  })
+})
+
+describe('state kept from an earlier version', () => {
+  test('takes the defaults for the fields that version did not have', () => {
+    const old = { percent: 50, cut: null, isIdle: true, hidden: null } as never
+
+    expect(signalsFrom(old)).toMatchObject({ percent: 50, pause: 'none', topic: null })
+    expect(adviceFor(signalsFrom(old)), 'no advice out of a missing field').toBe(null)
+  })
+
+  test('keeps what the ledger held and adds what it lacked', () => {
+    const big = { tool: 'Read', target: 'big.ts', tokens: 12_000 }
+    const ledger = ledgerFrom({ bigOutputs: [big], fullReads: {} })
+
+    expect(ledger).toEqual({ bigOutputs: [big], fullReads: {}, prompts: [], classifier: { asked: 0, tokens: 0 } })
+    expect(reportOf({ startedAt: 0, context: { window: 200_000 }, rateLimits: [] }, undefined, ledger, 0)).toContain('Salidas grandes')
+  })
+
+  test('starts from the defaults when nothing is stored', () => {
+    expect(signalsFrom(undefined)).toEqual({ percent: null, cut: null, pause: 'none', hidden: null, topic: null })
+    expect(ledgerFrom(null).classifier).toEqual({ asked: 0, tokens: 0 })
   })
 })
 

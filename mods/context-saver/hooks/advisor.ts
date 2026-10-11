@@ -32,7 +32,7 @@ export const LIMITS = {
   /** How often the band re-reads the engine's figures while nothing else does. */
   refreshMs: 60_000,
   /** The size of a gauge's bar where the surface draws vectors, in CSS pixels. */
-  barWidthPx: 120,
+  barWidthPx: 80,
   barHeightPx: 8,
 } as const
 
@@ -41,6 +41,31 @@ export const COMPACT_INSTRUCTIONS =
   'los archivos modificados y su estado, los tests y comandos corridos con su resultado, ' +
   'y lo pendiente. Descartá: salidas largas de herramientas, exploraciones descartadas ' +
   'y el contenido de archivos ya leídos.'
+
+/** The signals before anything is known. */
+export const QUIET_SIGNALS: Signals = { percent: null, cut: null, pause: 'none', hidden: null, topic: null }
+
+/** The ledger of a conversation that has spent nothing yet. */
+export const EMPTY_LEDGER: Ledger = {
+  bigOutputs: [],
+  fullReads: {},
+  prompts: [],
+  classifier: { asked: 0, tokens: 0 },
+}
+
+/**
+ * State as this version reads it. The host keeps state across a reload, so what is stored
+ * may come from an earlier version with fewer fields: those take their defaults.
+ */
+export const signalsFrom = (stored: Partial<Signals> | null | undefined): Signals => ({
+  ...QUIET_SIGNALS,
+  ...stored,
+})
+
+export const ledgerFrom = (stored: Partial<Ledger> | null | undefined): Ledger => ({
+  ...EMPTY_LEDGER,
+  ...stored,
+})
 
 /** The part of a breakdown the report reads. */
 export type Breakdown = Pick<SessionContextBreakdown, 'categories' | 'mcpTools'>

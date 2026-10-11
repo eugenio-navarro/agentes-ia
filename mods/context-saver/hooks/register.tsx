@@ -3,7 +3,9 @@ import type { EngineInterface, Register, Timer, ToolCallInput } from 'claude-cod
 
 import {
   COMPACT_INSTRUCTIONS,
+  EMPTY_LEDGER,
   LIMITS,
+  QUIET_SIGNALS,
   TOPIC_SYSTEM,
   adviceFor,
   afterFill,
@@ -19,7 +21,9 @@ import {
   formatCount,
   isSubstantial,
   isWorthAsking,
+  ledgerFrom,
   reportOf,
+  signalsFrom,
   statusTextOf,
   topicAnswer,
   topicInstructions,
@@ -28,13 +32,8 @@ import {
 } from './advisor'
 import type { AdviceKind, Gauge, Level, Ledger, Signals } from '../types'
 
-const QUIET: Signals = { percent: null, cut: null, pause: 'none', hidden: null, topic: null }
-const EMPTY: Ledger = {
-  bigOutputs: [],
-  fullReads: {},
-  prompts: [],
-  classifier: { asked: 0, tokens: 0 },
-}
+const QUIET = QUIET_SIGNALS
+const EMPTY = EMPTY_LEDGER
 
 const signals = atom({ plugin: 'context-saver', key: 'signals' } as const, QUIET)
 const ledger = atom({ plugin: 'context-saver', key: 'ledger' } as const, EMPTY)
@@ -252,7 +251,7 @@ const noteTopic = async ($: EngineInterface, text: string) => {
     return
   }
 
-  const { prompts, classifier } = await read($, ledger)
+  const { prompts, classifier } = ledgerFrom(await read($, ledger))
   const { percent } = await read($, signals)
   const remembered = (list: readonly string[]) => [...list, clipPrompt(text)].slice(-LIMITS.topicHistory)
 
@@ -288,6 +287,9 @@ const noteTopic = async ($: EngineInterface, text: string) => {
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
+    // A reload keeps the state an earlier version wrote: bring it to this version first.
+    await update($, signals, stored => signalsFrom(stored))
+    await update($, ledger, stored => ledgerFrom(stored))
     await $.command.register({
       name: 'uso',
       description: 'Uso del contexto y de tus límites, y qué ocupa lugar en esta conversación.',
@@ -305,7 +307,7 @@ export const register: Register = on => {
     const usage = await $.session.usage({ breakdown: 'summary' })
 
     return {
-      text: reportOf(usage, usage.context.breakdown, await read($, ledger), await $.clock.now()),
+      text: reportOf(usage, usage.context.breakdown, ledgerFrom(await read($, ledger)), await $.clock.now()),
     }
   })
 
@@ -383,7 +385,7 @@ export const register: Register = on => {
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     hasBand = true
-    const now = await read($, signals)
+    const now = signalsFrom(await read($, signals))
     const shown = await read($, figures)
 
     if (e.props.hasSurvey || shown === null) {
@@ -405,7 +407,7 @@ export const register: Register = on => {
       const isDanger = one.level === 'danger'
 
       return (
-        <Box columnGap={1} alignItems="center">
+        <Box columnGap={1} alignItems="center" flexShrink={0}>
           <Text color={isDanger ? color : MUTED}>{one.label}</Text>
           {Svg === null ? (
             <Text>
@@ -425,15 +427,20 @@ export const register: Register = on => {
       )
     }
 
+    // Nothing in the row shrinks, so a narrow band wraps it instead of drawing one part over another.
     // One row: the gauges, then, only when there is something to recommend, the command
     // itself as the one button to press, and Ignorar beside it.
     return (
-      <Box columnGap={3} alignItems="center">
+      <Box columnGap={3} alignItems="center" flexWrap="wrap">
         {gauge(shown.context)}
         {shown.limits.map(limit => gauge(limit))}
-        {shown.cost !== null && <Text color={MUTED}>{`Precio: ${shown.cost}`}</Text>}
+        {shown.cost !== null && (
+          <Box flexShrink={0}>
+            <Text color={MUTED}>{shown.cost}</Text>
+          </Box>
+        )}
         {kind !== null && command !== null && (
-          <Box columnGap={1}>
+          <Box columnGap={1} flexShrink={0}>
             <Button
               key={command}
               label={`/${command}`}

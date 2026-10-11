@@ -142,9 +142,10 @@ test('draws context and cost in the band above the prompt after a turn', async (
     } else {
       const bar = await ui.find({ type: 'Svg' })
       expect(String(bar?.props.source), 'a rounded bar').toContain('rx="4" fill="#4ade80"')
-      expect(bar?.props).toMatchObject({ alt: '42%', width: 120, height: 8 })
+      expect(bar?.props).toMatchObject({ alt: '42%', width: 80, height: 8 })
     }
-    expect(await ui.find({ type: 'Text', text: 'Precio: $1.50' })).toBeDefined()
+    const shown = (await ui.findAll({ type: 'Text' })).map(one => one.text)
+    expect(shown, 'the price alone, no label').toContain('$1.50')
     expect(await ui.find({ key: 'compact' }), 'no advice at 42%').toBe(undefined)
     await ui.unmount()
 
