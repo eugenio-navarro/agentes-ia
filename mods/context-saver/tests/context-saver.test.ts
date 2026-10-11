@@ -225,14 +225,54 @@ test('sizes the bars to the room the row leaves, with the same gaps with or with
   expect(await buttonsOf(ui), 'no buttons').toEqual([])
   expect(await barWidth(), 'the bar takes the room').toBe(128)
   expect(await row()).toMatchObject({ columnGap: 2 })
-  expect((await row())?.justifyContent, 'nothing is pushed apart').toBe(undefined)
+  expect((await row())?.justifyContent, 'centred, nothing pushed apart').toBe('center')
 
   world.usage = usageAt(85)
   await endTurn($)
   expect(await buttonsOf(ui), 'with buttons').toEqual(['compact', 'ignore'])
   expect(await barWidth(), 'the bar leaves the buttons their room').toBe(56)
   expect(await row()).toMatchObject({ columnGap: 2 })
-  expect((await row())?.justifyContent).toBe(undefined)
+  expect((await row())?.justifyContent).toBe('center')
+})
+
+test('centres the row in the band in every case: either surface, with or without buttons, price or windows', async ($, on) => {
+  const world = worldOf(on, 42)
+  const noPrice: SessionUsage = { startedAt: 0, context: usageAt(42).context, rateLimits: [] }
+  const windows: SessionUsage = {
+    ...usageAt(42),
+    rateLimits: [
+      { kind: 'five_hour', percentUsed: 0 },
+      { kind: 'seven_day', percentUsed: 65 },
+    ],
+  }
+  // Windows last: once seen, the mod keeps showing them.
+  const cases: [string, SessionUsage, string[], string][] = [
+    ['context and price', usageAt(42), [], 'Precio: $1.50'],
+    ['with the buttons', usageAt(85), ['compact', 'ignore'], 'Precio: $1.50'],
+    ['no price', noPrice, [], '42%'],
+    ['a window at 0%', windows, [], '0%'],
+  ]
+
+  for (const surface of SURFACES) {
+    const ui = await $.ui.mount({ ...BAND, surface })
+
+    for (const [name, usage, buttons, shown] of cases) {
+      world.usage = usage
+      await endTurn($)
+
+      expect((await ui.findAll({ type: 'Box' }))[0]?.props, `${surface}: ${name}`).toMatchObject({
+        width: '100%',
+        justifyContent: 'center',
+        alignItems: 'center',
+        columnGap: 2,
+        flexWrap: 'wrap',
+      })
+      expect(await buttonsOf(ui), `${surface}: ${name}`).toEqual(buttons)
+      expect((await ui.findAll({ type: 'Text' })).map(one => one.text), `${surface}: ${name}`).toContain(shown)
+    }
+
+    await ui.unmount()
+  }
 })
 
 test('stays quiet under 40%, whatever happened', async ($, on) => {

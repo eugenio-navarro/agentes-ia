@@ -426,10 +426,11 @@ export const register: Register = on => {
     }
 
     // Nothing in the row shrinks, so a narrow band wraps it instead of drawing one part over another.
+    // The row spans the band and its parts sit together in the middle, each line of a wrapped row too.
     // One row: the gauges, then, only when there is something to recommend, the command
     // itself as the one button to press, which runs it, and Ignorar beside it.
     return (
-      <Box columnGap={LIMITS.rowGapCells} alignItems="center" flexWrap="wrap">
+      <Box columnGap={LIMITS.rowGapCells} alignItems="center" flexWrap="wrap" width="100%" justifyContent="center">
         {gauge(shown.context)}
         {shown.limits.map(limit => gauge(limit))}
         {shown.cost !== null && (
