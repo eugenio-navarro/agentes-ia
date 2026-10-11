@@ -427,6 +427,10 @@ const listed = (title: string, items: readonly string[]): string[] =>
 export const levelFor = (percent: number): Level =>
   percent >= LIMITS.urgentAt ? 'danger' : percent >= LIMITS.compactAt ? 'warn' : 'ok'
 
+/** A command's text without the plugin's name the engine puts before it where it shows it. */
+export const withoutName = (text: string, plugin: string): string =>
+  text.startsWith(`${plugin}: `) ? text.slice(plugin.length + 2) : text
+
 /** One line of the /uso report, as the transcript draws it. */
 export type ReportBlock =
   | { kind: 'figure'; label: string; percent: number; detail: string | null }
@@ -537,7 +541,7 @@ export const reportOf = (
     ...(ledger.classifier.asked === 0
       ? []
       : [
-          `• Detección de cambio de tema: ${ledger.classifier.asked} ${ledger.classifier.asked === 1 ? 'consulta' : 'consultas'}, ${formatCount(ledger.classifier.tokens)} tokens`,
+          `• Detección de cambio de tema: ${ledger.classifier.asked} ${ledger.classifier.asked === 1 ? 'consulta' : 'consultas'} del mod a Haiku · ${formatCount(ledger.classifier.tokens)} tokens`,
         ]),
   ]
 

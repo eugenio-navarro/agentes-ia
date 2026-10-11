@@ -512,13 +512,14 @@ test('/uso says what the detection itself spent', async ($, on) => {
     presentation: { isFullscreen: false, columns: 80 },
   })
 
-  expect(ran.text).toContain('Detección de cambio de tema: 1 consulta, 302 tokens')
+  expect(ran.text).toContain('Detección de cambio de tema: 1 consulta del mod a Haiku · 302 tokens')
 })
 
 test("draws the /uso report in the transcript with the band's bars, a title per part and one row per figure", async ($, on) => {
   worldOf(on, 20)
+  // As the engine hands it over: the plugin's name before what the command answered.
   const text = [
-    'Contexto  ██████████░░░░░░░░░░  48% · 476k de 1M tokens',
+    'context-saver: Contexto  ██████████░░░░░░░░░░  48% · 476k de 1M tokens',
     '7 días    █████████████████░░░  85%',
     'Precio de la sesión: $16.45',
     '',
@@ -548,6 +549,8 @@ test("draws the /uso report in the transcript with the band's bars, a title per 
     )
     expect(labelOf('Conectores más pesados')).toMatchObject({ color: '#9ca3af' })
     expect(texts.map(one => one.text)).toContain('browser 11k')
+    expect(texts.map(one => one.text), 'the first label, without the name').toContain('Contexto')
+    expect(texts.some(one => String(one.text).includes('context-saver'))).toBe(false)
 
     const bars = (await ui.findAll({ type: 'Svg' })).map(one => String(one.props.source))
     expect(bars.length, 'vector bars only where the surface draws them').toBe(surface === 'terminal' ? 0 : 3)

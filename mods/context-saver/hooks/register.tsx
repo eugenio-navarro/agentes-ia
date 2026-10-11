@@ -33,11 +33,13 @@ import {
   topicQuestion,
   windowLabelOf,
   windowsShown,
+  withoutName,
 } from './advisor'
 import type { AdviceKind, Gauge, Level, Ledger, Signals } from '../types'
 
 const QUIET = QUIET_SIGNALS
 const IGNORE_LABEL = 'Ignorar'
+const PLUGIN = 'context-saver'
 const EMPTY = EMPTY_LEDGER
 
 const signals = atom({ plugin: 'context-saver', key: 'signals' } as const, QUIET)
@@ -519,7 +521,7 @@ export const register: Register = on => {
     return (
       <Box flexDirection="column">
         <Text bold>Uso</Text>
-        {reportBlocks(e.props.text).map(block => {
+        {reportBlocks(withoutName(e.props.text, PLUGIN)).map(block => {
           switch (block.kind) {
             case 'figure':
               return row(block.label, 10, block.percent, LEVEL_COLORS[levelFor(block.percent)], block.detail)

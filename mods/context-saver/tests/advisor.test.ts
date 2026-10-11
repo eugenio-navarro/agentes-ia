@@ -23,6 +23,7 @@ import {
   topicInstructions,
   topicQuestion,
   windowsShown,
+  withoutName,
 } from '../hooks/advisor'
 import type { Figures, Signals } from '../types'
 
@@ -171,6 +172,14 @@ describe('windowsShown', () => {
       week,
     ])
     expect(windowsShown([], [week], AT + 3 * 60_000), 'no reset time known').toEqual([week])
+  })
+})
+
+describe('withoutName', () => {
+  test("drops the plugin's name the engine puts before a command's text, and nothing else", () => {
+    expect(withoutName('context-saver: Contexto  sin datos', 'context-saver')).toBe('Contexto  sin datos')
+    expect(withoutName('Contexto  sin datos', 'context-saver')).toBe('Contexto  sin datos')
+    expect(withoutName('Precio de la sesión: $1.00', 'context-saver')).toBe('Precio de la sesión: $1.00')
   })
 })
 
