@@ -8,12 +8,12 @@ import {
   QUIET_SIGNALS,
   TOPIC_SYSTEM,
   adviceFor,
-  afterFill,
   barCellsFor,
   barSvg,
   clipPrompt,
   baseName,
   commandFor,
+  costTextOf,
   cutOf,
   estimateTokens,
   figuresOf,
@@ -25,6 +25,7 @@ import {
   levelFor,
   reportBlocks,
   reportOf,
+  rowCellsOf,
   signalsFrom,
   statusTextOf,
   topicAnswer,
@@ -36,6 +37,7 @@ import {
 import type { AdviceKind, Gauge, Level, Ledger, Signals } from '../types'
 
 const QUIET = QUIET_SIGNALS
+const IGNORE_LABEL = 'Ignorar'
 const EMPTY = EMPTY_LEDGER
 
 const signals = atom({ plugin: 'context-saver', key: 'signals' } as const, QUIET)
@@ -223,37 +225,15 @@ const noteWholeRead = async ($: EngineInterface, e: ToolCallInput) => {
   }
 }
 
-const compact = async ($: EngineInterface, instructions: string) => {
-  const outcome = afterFill(await $.prompt.fill({ text: `/compact ${instructions}` }))
-
-  if (outcome === 'written') {
-    return
-  }
-
-  if (outcome === 'refused') {
-    $.ui.toast('No pude escribir en el prompt. Escribí /compact para compactar.')
-
-    return
-  }
-
+/**
+ * Runs the command the person pressed, as if they had typed it; pressing is their decision.
+ * What follows a compaction or a clear is noted by the hooks on those events.
+ */
+const runCommand = async ($: EngineInterface, command: 'compact' | 'clear', args?: string) => {
   try {
-    const done = await $.session.compact({ instructions })
-
-    if (done.skip === undefined) {
-      await startOver($)
-    } else {
-      $.ui.toast(`No se compactó: ${done.skip}`)
-    }
+    await $.command.run({ command, ...(args === undefined ? {} : { args }) })
   } catch {
-    $.ui.toast('No se pudo compactar ahora. Probá con /compact cuando termine el turno.')
-  }
-}
-
-const clear = async ($: EngineInterface) => {
-  const outcome = afterFill(await $.prompt.fill({ text: '/clear' }))
-
-  if (outcome !== 'written') {
-    $.ui.toast('Escribí /clear para limpiar la conversación.', { timeoutMs: 8000 })
+    $.ui.toast(`No pude ejecutar /${command} ahora. Escribilo en el prompt.`, { timeoutMs: 8000 })
   }
 }
 
@@ -413,7 +393,9 @@ export const register: Register = on => {
     const Svg = e.surface === 'terminal' ? null : $.ui.resolve(e).Svg
     const kind = e.props.isWorking ? null : adviceFor(now)
     const command = kind === null ? null : commandFor(kind)
-    const cells = barCellsFor(e.props.bodyColumns)
+    const buttons = command === null ? [] : [`/${command}`, IGNORE_LABEL]
+    // The gaps stay as they are: the room the row leaves goes to the bars.
+    const cells = barCellsFor(e.props.bodyColumns, rowCellsOf(shown, buttons), 1 + shown.limits.length)
 
     // A muted label, a thick rounded bar coloured up to what is used, and the percentage
     // in bold; at the danger level the whole gauge takes the colour.
@@ -423,7 +405,7 @@ export const register: Register = on => {
       const isDanger = one.level === 'danger'
 
       return (
-        <Box columnGap={1} alignItems="center" flexShrink={0}>
+        <Box columnGap={LIMITS.innerGapCells} alignItems="center" flexShrink={0}>
           <Text color={isDanger ? color : MUTED}>{one.label}</Text>
           {Svg === null ? (
             <Text>
@@ -432,9 +414,9 @@ export const register: Register = on => {
             </Text>
           ) : (
             <Svg
-              source={barSvg(one.percent, color, TRACK, LIMITS.barWidthPx, LIMITS.barHeightPx)}
+              source={barSvg(one.percent, color, TRACK, cells * LIMITS.cellPx, LIMITS.barHeightPx)}
               alt={`${one.percent}%`}
-              width={LIMITS.barWidthPx}
+              width={cells * LIMITS.cellPx}
               height={LIMITS.barHeightPx}
             />
           )}
@@ -443,34 +425,37 @@ export const register: Register = on => {
       )
     }
 
-    // Nothing in the row shrinks, so a narrow band wraps it instead of drawing one part over another;
-    // and what room is left goes between its parts, so it reaches both edges with or without buttons.
+    // Nothing in the row shrinks, so a narrow band wraps it instead of drawing one part over another.
     // One row: the gauges, then, only when there is something to recommend, the command
-    // itself as the one button to press, and Ignorar beside it.
+    // itself as the one button to press, which runs it, and Ignorar beside it.
     return (
-      <Box columnGap={2} alignItems="center" flexWrap="wrap" width="100%" justifyContent="space-between">
+      <Box columnGap={LIMITS.rowGapCells} alignItems="center" flexWrap="wrap">
         {gauge(shown.context)}
         {shown.limits.map(limit => gauge(limit))}
         {shown.cost !== null && (
           <Box flexShrink={0}>
-            <Text color={MUTED}>{`Precio: ${shown.cost}`}</Text>
+            <Text color={MUTED}>{costTextOf(shown.cost)}</Text>
           </Box>
         )}
         {kind !== null && command !== null && (
-          <Box columnGap={1} flexShrink={0}>
+          <Box columnGap={LIMITS.innerGapCells} flexShrink={0}>
             <Button
               key={command}
               label={`/${command}`}
               variant="primary"
               onPress={() =>
                 void (command === 'clear'
-                  ? clear($)
-                  : compact($, now.topic !== null && kind === 'topic' ? topicInstructions(now.topic) : COMPACT_INSTRUCTIONS))
+                  ? runCommand($, command)
+                  : runCommand(
+                      $,
+                      command,
+                      now.topic !== null && kind === 'topic' ? topicInstructions(now.topic) : COMPACT_INSTRUCTIONS,
+                    ))
               }
             />
             <Button
               key="ignore"
-              label="Ignorar"
+              label={IGNORE_LABEL}
               onPress={() =>
                 // Ignoring a change of subject settles it: it is not brought up again.
                 void update($, signals, seen => ({

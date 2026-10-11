@@ -31,9 +31,17 @@ export const LIMITS = {
   topicAsksPerSession: 30,
   /** How often the band re-reads the engine's figures while nothing else does. */
   refreshMs: 60_000,
-  /** The size of a gauge's bar where the surface draws vectors, in CSS pixels. */
-  barWidthPx: 56,
+  /** A bar's length in cells: no shorter than reads as a bar, no longer than looks like one. */
+  barMinCells: 7,
+  barMaxCells: 16,
+  /** A cell's width and a bar's height where the surface draws vectors, in CSS pixels. */
+  cellPx: 8,
   barHeightPx: 8,
+  /** The row's spacing in cells: between its parts, and inside a gauge or between buttons. */
+  rowGapCells: 2,
+  innerGapCells: 1,
+  /** What a button takes around its label. */
+  buttonPadCells: 4,
   /** The bars of the /uso report: in pixels where drawn as vectors, in cells as text. */
   reportBarPx: 120,
   reportBarCells: 20,
@@ -210,24 +218,6 @@ export const topicInstructions = (topic: string): string =>
   `Cambio de tema. Conservá solo lo que sirva para el tema nuevo: «${topic}». ` +
   'Descartá la conversación anterior a ese mensaje, salvo las decisiones o los archivos que el tema nuevo necesite.'
 
-/**
- * What became of a command written to the prompt box. Only `no_composer` says no box exists,
- * so only then may the mod run the command for the person; any other refusal is unknown.
- */
-export type FillOutcome = 'written' | 'no-box' | 'refused'
-
-/** Reads a prompt fill's answer. */
-export const afterFill = (filled: {
-  isFilled: boolean
-  refusal?: 'no_composer' | 'dialog'
-}): FillOutcome => {
-  if (filled.isFilled) {
-    return 'written'
-  }
-
-  return filled.refusal === 'no_composer' ? 'no-box' : 'refused'
-}
-
 /** A local estimate, about four characters to a token; never the API's count. */
 export const estimateTokens = (text: string): number => Math.ceil(text.length / 4)
 
@@ -275,7 +265,7 @@ export const statusTextOf = (figures: Figures | null): string | undefined =>
     ? undefined
     : [figures.context, ...figures.limits]
         .map(gauge => `${gauge.label} ${gauge.percent}%`)
-        .concat(figures.cost === null ? [] : [`Precio: ${figures.cost}`])
+        .concat(figures.cost === null ? [] : [costTextOf(figures.cost)])
         .join(' · ')
 
 /** How long until `iso`, in its two largest units; null for a date that does not parse. */
@@ -304,8 +294,40 @@ export const resetIn = (iso: string, nowMs: number): string | null => {
     .join(' ')}`
 }
 
-/** Cells each gauge's bar takes in a band `columns` wide, so three gauges and the cost fit a row. */
-export const barCellsFor = (columns: number): number => (columns >= 100 ? 14 : columns >= 70 ? 8 : 5)
+/** The session's price as the band and the status line write it. */
+export const costTextOf = (cost: string): string => `Precio: ${cost}`
+
+const WIDEST_PERCENT = '100%'.length
+
+/**
+ * Cells the band's row takes without its bars: every text, the buttons and the gaps. A
+ * percentage counts at its widest, so a bar keeps its length as the figure grows.
+ */
+export const rowCellsOf = (shown: Figures, buttons: readonly string[]): number => {
+  const sum = (cells: readonly number[]) => cells.reduce((total, one) => total + one, 0)
+  const gauges = [shown.context, ...shown.limits].map(
+    gauge => gauge.label.length + WIDEST_PERCENT + 2 * LIMITS.innerGapCells,
+  )
+  const cost = shown.cost === null ? [] : [costTextOf(shown.cost).length]
+  const pressed =
+    buttons.length === 0
+      ? []
+      : [
+          sum(buttons.map(label => label.length + LIMITS.buttonPadCells)) +
+            (buttons.length - 1) * LIMITS.innerGapCells,
+        ]
+  const parts = [...gauges, ...cost, ...pressed]
+
+  return sum(parts) + (parts.length - 1) * LIMITS.rowGapCells
+}
+
+/**
+ * Cells for each of the row's `bars`: the room a band `columns` wide leaves once `taken`
+ * is drawn, shared between them and kept within what reads as a bar. The gaps never
+ * stretch: what room there is goes to the bars.
+ */
+export const barCellsFor = (columns: number, taken: number, bars: number): number =>
+  Math.min(LIMITS.barMaxCells, Math.max(LIMITS.barMinCells, Math.floor((columns - taken) / bars)))
 
 /** How many of a bar's `cells` are filled at `percent`; any use at all fills one. */
 export const filledCells = (percent: number, cells: number): number =>

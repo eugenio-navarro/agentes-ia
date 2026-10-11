@@ -24,10 +24,10 @@ type World = {
   usage: SessionUsage
   output: string
   isError: boolean
-  hasComposer: boolean
+  refusesCommands: boolean
   statuses: (string | undefined)[]
   toasts: string[]
-  fills: string[]
+  commands: string[]
   compactions: (string | undefined)[]
   topicAnswer: string | null
   asked: string[]
@@ -50,10 +50,10 @@ const worldOf = (on: On, percent: number | undefined): World => {
     usage: usageAt(percent),
     output: 'ok',
     isError: false,
-    hasComposer: true,
+    refusesCommands: false,
     statuses: [],
     toasts: [],
-    fills: [],
+    commands: [],
     compactions: [],
     topicAnswer: 'MISMO',
     asked: [],
@@ -80,12 +80,14 @@ const worldOf = (on: On, percent: number | undefined): World => {
       ? { isError: true as const, result: world.output, text: world.output }
       : ({ result: world.output, text: world.output } as never),
   )
-  on('prompt.fill', ($, e) => {
-    if (world.hasComposer) {
-      world.fills.push(e.text)
+  on('command.run', ($, e) => {
+    if (world.refusesCommands) {
+      throw new Error('not now')
     }
 
-    return { isFilled: world.hasComposer }
+    world.commands.push(`/${e.command} ${e.args}`.trim())
+
+    return { text: '' }
   })
   on('model.complete', ($, e) => {
     world.asked.push(e.prompt)
@@ -137,12 +139,12 @@ test('draws context and cost in the band above the prompt after a turn', async (
     expect((await ui.find({ type: 'Text', text: /^42%$/ }))?.props).toMatchObject({ bold: true })
     if (surface === 'terminal') {
       const texts = await ui.findAll({ type: 'Text' })
-      expect(texts.find(one => one.text === '███')?.props, 'used').toMatchObject({ color: '#4ade80' })
-      expect(texts.find(one => one.text === '█████')?.props, 'left').toMatchObject({ color: '#4b5563' })
+      expect(texts.find(one => one.text === '███████')?.props, 'used').toMatchObject({ color: '#4ade80' })
+      expect(texts.find(one => one.text === '█████████')?.props, 'left').toMatchObject({ color: '#4b5563' })
     } else {
       const bar = await ui.find({ type: 'Svg' })
       expect(String(bar?.props.source), 'a rounded bar').toContain('rx="4" fill="#4ade80"')
-      expect(bar?.props).toMatchObject({ alt: '42%', width: 56, height: 8 })
+      expect(bar?.props).toMatchObject({ alt: '42%', width: 128, height: 8 })
     }
     const shown = (await ui.findAll({ type: 'Text' })).map(one => one.text)
     expect(shown, 'the price with its label, in one piece').toContain('Precio: $1.50')
@@ -213,20 +215,24 @@ const buttonsOf = async (ui: {
   findAll(query: { type: string }): Promise<{ key: string | undefined }[]>
 }) => (await ui.findAll({ type: 'Button' })).map(button => button.key)
 
-test('spreads the row from edge to edge of the band, with or without the buttons', async ($, on) => {
+test('sizes the bars to the room the row leaves, with the same gaps with or without the buttons', async ($, on) => {
   const world = worldOf(on, 42)
-  const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
+  const ui = await $.ui.mount({ ...BAND, props: { ...BAND.props, bodyColumns: 60 }, surface: 'desktop' })
   const row = async () => (await ui.findAll({ type: 'Box' }))[0]?.props
-  const spread = { width: '100%', justifyContent: 'space-between' }
+  const barWidth = async () => (await ui.find({ type: 'Svg' }))?.props.width
 
   await endTurn($)
   expect(await buttonsOf(ui), 'no buttons').toEqual([])
-  expect(await row()).toMatchObject(spread)
+  expect(await barWidth(), 'the bar takes the room').toBe(128)
+  expect(await row()).toMatchObject({ columnGap: 2 })
+  expect((await row())?.justifyContent, 'nothing is pushed apart').toBe(undefined)
 
   world.usage = usageAt(85)
   await endTurn($)
   expect(await buttonsOf(ui), 'with buttons').toEqual(['compact', 'ignore'])
-  expect(await row()).toMatchObject(spread)
+  expect(await barWidth(), 'the bar leaves the buttons their room').toBe(56)
+  expect(await row()).toMatchObject({ columnGap: 2 })
+  expect((await row())?.justifyContent).toBe(undefined)
 })
 
 test('stays quiet under 40%, whatever happened', async ($, on) => {
@@ -344,37 +350,37 @@ test('Ignorar hides the recommendation until there is a new reason', async ($, o
   expect(await buttonsOf(ui)).toEqual(['compact', 'ignore'])
 })
 
-test('the button writes its command in the prompt box for the person to send', async ($, on) => {
+test('the button runs its command itself, as if the person had typed it', async ($, on) => {
   const world = worldOf(on, 85)
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
 
   await endTurn($)
   await ui.press({ key: 'compact' })
-  expect(world.fills[0]?.startsWith('/compact Conservá')).toBe(true)
+  expect(world.commands[0]?.startsWith('/compact Conservá')).toBe(true)
 
   await run($, 'git commit -m x')
   await endTurn($)
   await world.clock.advance(TEN_MINUTES)
   await ui.press({ key: 'clear' })
-  expect(world.fills[1]).toBe('/clear')
-  expect(world.compactions).toEqual([])
+  expect(world.commands[1]).toBe('/clear')
+  expect(world.toasts, 'nothing to explain').toEqual([])
 })
 
-test('when the prompt box refuses, runs nothing and names the command', async ($, on) => {
+test('when the engine will not run the command, says so and names it', async ($, on) => {
   const world = worldOf(on, 85)
-  world.hasComposer = false
+  world.refusesCommands = true
   const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
 
   await endTurn($)
   await ui.press({ key: 'compact' })
   expect(world.toasts.at(-1)).toContain('/compact')
-  expect(world.compactions).toEqual([])
 
   await run($, 'git commit -m x')
   await endTurn($)
   await world.clock.advance(TEN_MINUTES)
   await ui.press({ key: 'clear' })
   expect(world.toasts.at(-1)).toContain('/clear')
+  expect(world.commands).toEqual([])
 })
 
 const FIRST_PROMPT = 'arreglá el cálculo de impuestos en la factura por favor'
@@ -416,9 +422,8 @@ test('after a change of subject, recommends a /compact that keeps only the new o
   expect(await buttonsOf(ui)).toEqual(['compact', 'ignore'])
 
   await ui.press({ key: 'compact' })
-  expect(world.fills.at(-1)?.startsWith('/compact Cambio de tema')).toBe(true)
-  expect(world.fills.at(-1)).toContain(OTHER_PROMPT)
-  expect(world.compactions, 'the person sends it, not the mod').toEqual([])
+  expect(world.commands.at(-1)?.startsWith('/compact Cambio de tema')).toBe(true)
+  expect(world.commands.at(-1)).toContain(OTHER_PROMPT)
 })
 
 test('Ignorar on a change of subject drops it, and later prompts are compared with the new subject', async ($, on) => {

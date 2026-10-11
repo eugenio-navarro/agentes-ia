@@ -2,7 +2,6 @@ import { describe, expect, test } from 'claude-code/testing'
 
 import {
   adviceFor,
-  afterFill,
   barCellsFor,
   barSvg,
   commandFor,
@@ -15,6 +14,7 @@ import {
   levelFor,
   reportBlocks,
   reportOf,
+  rowCellsOf,
   resetIn,
   shortCount,
   signalsFrom,
@@ -24,7 +24,7 @@ import {
   topicQuestion,
   windowsShown,
 } from '../hooks/advisor'
-import type { Signals } from '../types'
+import type { Figures, Signals } from '../types'
 
 const signals = (over: Partial<Signals>): Signals => ({
   percent: null,
@@ -205,15 +205,6 @@ describe('reportBlocks', () => {
   })
 })
 
-describe('afterFill', () => {
-  test('compacts by itself only where the engine says no prompt box exists', () => {
-    expect(afterFill({ isFilled: true })).toBe('written')
-    expect(afterFill({ isFilled: false, refusal: 'no_composer' })).toBe('no-box')
-    expect(afterFill({ isFilled: false, refusal: 'dialog' })).toBe('refused')
-    expect(afterFill({ isFilled: false })).toBe('refused')
-  })
-})
-
 describe('cutOf', () => {
   test('reads a commit', () => {
     expect(cutOf('git commit -m "feat: x"')).toBe('commit')
@@ -240,9 +231,38 @@ describe('estimateTokens', () => {
   })
 })
 
+describe('rowCellsOf', () => {
+  const figures: Figures = {
+    context: { label: 'contexto', percent: 78, level: 'warn' },
+    limits: [
+      { label: '5 h', percent: 0, level: 'ok' },
+      { label: '7 días', percent: 85, level: 'danger' },
+    ],
+    cost: '$16.45',
+  }
+
+  test('counts every text, gap and button of the row, but not the bars', () => {
+    expect(rowCellsOf(figures, [])).toBe(55)
+    expect(rowCellsOf(figures, ['/compact', 'Ignorar'])).toBe(81)
+  })
+
+  test('counts a percentage at its widest, so a bar keeps its length as the figure grows', () => {
+    expect(rowCellsOf({ ...figures, context: { ...figures.context, percent: 100 } }, [])).toBe(55)
+  })
+
+  test('counts no price where there is none', () => {
+    expect(rowCellsOf({ ...figures, cost: null }, [])).toBe(39)
+  })
+})
+
 describe('barCellsFor', () => {
-  test('gives longer bars to a wider band', () => {
-    expect([40, 70, 99, 100, 160].map(barCellsFor)).toEqual([5, 8, 8, 14, 14])
+  test('shares the room the row leaves between its bars', () => {
+    expect(barCellsFor(93, 55, 3)).toBe(12)
+  })
+
+  test('keeps a bar within what reads as one', () => {
+    expect(barCellsFor(93, 81, 3), 'a crowded row').toBe(7)
+    expect(barCellsFor(200, 29, 1), 'a row with room to spare').toBe(16)
   })
 })
 
