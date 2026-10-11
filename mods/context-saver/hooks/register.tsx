@@ -7,6 +7,7 @@ import {
   adviceFor,
   afterFill,
   barCellsFor,
+  barSvg,
   baseName,
   cutOf,
   estimateTokens,
@@ -211,8 +212,8 @@ const clear = async ($: EngineInterface) => {
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
-      name: 'ahorro',
-      description: 'Muestra qué ocupa el contexto y en qué lo gastó esta conversación.',
+      name: 'uso',
+      description: 'Uso del contexto y de tus límites, y qué ocupa lugar en esta conversación.',
     })
     await refresh($)
     refreshTimer?.cancel()
@@ -223,7 +224,7 @@ export const register: Register = on => {
     return next(e)
   })
 
-  on('command.run', { command: 'ahorro' }, async $ => {
+  on('command.run', { command: 'uso' }, async $ => {
     const usage = await $.session.usage({ breakdown: 'summary' })
 
     return {
@@ -308,24 +309,35 @@ export const register: Register = on => {
     }
 
     const { Box, Button, Text } = $.ui.resolve(e)
+    // A terminal has no vector element: there the bar is drawn in block characters.
+    const Svg = e.surface === 'terminal' ? null : $.ui.resolve(e).Svg
     const { percent } = now
     const kind = e.props.isWorking ? null : adviceFor(now)
     const cells = barCellsFor(e.props.bodyColumns)
 
-    // A muted label, one line coloured up to what is used, and the percentage in bold;
-    // at the danger level the whole gauge takes the colour.
+    // A muted label, a thick rounded bar coloured up to what is used, and the percentage
+    // in bold; at the danger level the whole gauge takes the colour.
     const gauge = (one: Gauge) => {
       const used = filledCells(one.percent, cells)
       const color = LEVEL_COLORS[one.level]
       const isDanger = one.level === 'danger'
 
       return (
-        <Box columnGap={1}>
+        <Box columnGap={1} alignItems="center">
           <Text color={isDanger ? color : MUTED}>{one.label}</Text>
-          <Text>
-            {used > 0 && <Text color={color}>{'━'.repeat(used)}</Text>}
-            {used < cells && <Text color={TRACK}>{'━'.repeat(cells - used)}</Text>}
-          </Text>
+          {Svg === null ? (
+            <Text>
+              {used > 0 && <Text color={color}>{'█'.repeat(used)}</Text>}
+              {used < cells && <Text color={TRACK}>{'█'.repeat(cells - used)}</Text>}
+            </Text>
+          ) : (
+            <Svg
+              source={barSvg(one.percent, color, TRACK, LIMITS.barWidthPx, LIMITS.barHeightPx)}
+              alt={`${one.percent}%`}
+              width={LIMITS.barWidthPx}
+              height={LIMITS.barHeightPx}
+            />
+          )}
           <Text bold {...(isDanger ? { color } : {})}>{`${one.percent}%`}</Text>
         </Box>
       )
@@ -333,7 +345,7 @@ export const register: Register = on => {
 
     return (
       <Box flexDirection="column">
-        <Box columnGap={3}>
+        <Box columnGap={3} alignItems="center">
           {gauge(shown.context)}
           {shown.limits.map(limit => gauge(limit))}
           {shown.cost !== null && <Text color={MUTED}>{shown.cost}</Text>}

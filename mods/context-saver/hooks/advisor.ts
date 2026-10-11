@@ -22,8 +22,9 @@ export const LIMITS = {
   rateLimitWarn: 80,
   /** How often the band re-reads the engine's figures while nothing else does. */
   refreshMs: 60_000,
-  /** Rows a section of the report lists at most. */
-  reportRows: 6,
+  /** The size of a gauge's bar where the surface draws vectors, in CSS pixels. */
+  barWidthPx: 120,
+  barHeightPx: 8,
 } as const
 
 export const COMPACT_INSTRUCTIONS =
@@ -33,8 +34,7 @@ export const COMPACT_INSTRUCTIONS =
   'y el contenido de archivos ya leídos.'
 
 /** The part of a breakdown the report reads. */
-export type Breakdown = Pick<SessionContextBreakdown, 'categories' | 'mcpTools' | 'memoryFiles'> &
-  Partial<Pick<SessionContextBreakdown, 'skills'>>
+export type Breakdown = Pick<SessionContextBreakdown, 'categories' | 'mcpTools'>
 
 const COMMIT = /\bgit\s+(?:-\S+\s+)*commit\b/
 const TESTS =
@@ -142,7 +142,7 @@ export const figuresOf = ({ context, cost, rateLimits }: SessionUsage): Figures 
   }
 
   return {
-    context: gaugeOf('ctx', context.percent, LIMITS.compactAt, LIMITS.urgentAt),
+    context: gaugeOf('contexto', context.percent, LIMITS.compactAt, LIMITS.urgentAt),
     limits: rateLimits.map(limit =>
       gaugeOf(
         windowLabelOf(limit.kind),
@@ -197,104 +197,144 @@ export const barCellsFor = (columns: number): number => (columns >= 100 ? 14 : c
 export const filledCells = (percent: number, cells: number): number =>
   Math.min(cells, Math.max(percent > 0 ? 1 : 0, Math.round((percent / 100) * cells)))
 
-const top = <T>(rows: readonly T[], tokensOf: (row: T) => number): T[] =>
-  [...rows].sort((a, b) => tokensOf(b) - tokensOf(a)).slice(0, LIMITS.reportRows)
+/**
+ * A rounded bar as SVG markup, for a surface that draws vectors: the track, with what is
+ * used over it. Any use at all shows at least a round dot.
+ */
+export const barSvg = (
+  percent: number,
+  color: string,
+  track: string,
+  width: number,
+  height: number,
+): string => {
+  const used = percent <= 0 ? 0 : Math.max(height, Math.round((Math.min(percent, 100) / 100) * width))
+  const rect = (rectWidth: number, fill: string) =>
+    `<rect width="${rectWidth}" height="${height}" rx="${height / 2}" fill="${fill}"/>`
 
-const section = (title: string, rows: readonly string[]): string[] =>
-  rows.length === 0 ? [] : ['', title, ...rows.map(row => `  ${row}`)]
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">` +
+    `${rect(width, track)}${used > 0 ? rect(used, color) : ''}</svg>`
+  )
+}
 
-const connectorRows = (tools: Breakdown['mcpTools']): string[] => {
-  const loaded = new Map<string, { tokens: number; tools: number }>()
-  const deferred = new Set<string>()
-
-  for (const tool of tools) {
-    if (!tool.isLoaded) {
-      deferred.add(tool.serverName)
-      continue
-    }
-
-    const sum = loaded.get(tool.serverName) ?? { tokens: 0, tools: 0 }
-    loaded.set(tool.serverName, { tokens: sum.tokens + tool.tokens, tools: sum.tools + 1 })
+/** A token count as people say it: 950, 12k, 476k, 1,3M. */
+export const shortCount = (count: number): string => {
+  if (count < 1000) {
+    return String(Math.round(count))
   }
 
-  const waiting = [...deferred].filter(name => !loaded.has(name)).length
-  const rows = top([...loaded], ([, sum]) => sum.tokens).map(
-    ([name, sum]) =>
-      `${name}: ${formatCount(sum.tokens)} (${sum.tools} ${sum.tools === 1 ? 'herramienta' : 'herramientas'})`,
-  )
-
-  return waiting === 0
-    ? rows
-    : [
-        ...rows,
-        `+ ${waiting} ${waiting === 1 ? 'conector' : 'conectores'} con esquemas diferidos (no ocupan hasta usarse)`,
-      ]
+  return count < 999_500
+    ? `${Math.round(count / 1000)}k`
+    : `${String(Math.round(count / 100_000) / 10).replace('.', ',')}M`
 }
 
-const windowRow = ({ context, cost }: SessionUsage): string => {
-  const spent = cost === undefined ? '' : ` · US$${cost.usd.toFixed(2)}`
+const REPORT_BAR_CELLS = 20
+const REPORT_LABEL_WIDTH = 10
+const WINDOW_NAMES: Readonly<Record<string, string>> = { five_hour: '5 horas', seven_day: '7 días' }
 
-  return context.tokens === undefined || context.percent === undefined
-    ? `Contexto: sin datos todavía (ventana de ${formatCount(context.window)} tokens)${spent}`
-    : `Contexto: ${formatCount(context.tokens)} de ${formatCount(context.window)} tokens (${context.percent}%)${spent}`
+/** The engine's category names, gathered under the four names the report shows. */
+const GROUPS: readonly (readonly [string, readonly string[]])[] = [
+  ['Conversación', ['Messages']],
+  ['Herramientas', ['System tools', 'MCP tools', 'Custom agents']],
+  ['Skills', ['Skills']],
+  ['Instrucciones y memoria', ['System prompt', 'Memory files']],
+]
+
+/** One figure of the report: its name, a bar, the percentage and what else is worth saying. */
+const figureRow = (name: string, percent: number, detail: string | null): string => {
+  const used = filledCells(percent, REPORT_BAR_CELLS)
+  const bar = '█'.repeat(used) + '░'.repeat(REPORT_BAR_CELLS - used)
+  const shown = `${Math.round(percent)}%`.padStart(4)
+
+  return `${name.padEnd(REPORT_LABEL_WIDTH)}${bar} ${shown}${detail === null ? '' : ` · ${detail}`}`
 }
 
-/** A rate-limit window as the engine last reported it, to its decimal, with its reset. */
-const limitRow = (limit: SessionUsage['rateLimits'][number], nowMs: number): string => {
-  const reset = limit.resetsAt === undefined ? null : resetIn(limit.resetsAt, nowMs)
-  const used = String(limit.percentUsed).replace('.', ',')
+/** What fills the window, grouped and largest first; a category the mod does not know keeps its name. */
+const groupRows = (categories: Breakdown['categories']): string[] => {
+  const used = categories.filter(row => row.kind === 'used' && row.tokens > 0)
+  const total = used.reduce((sum, row) => sum + row.tokens, 0)
+  const grouped = new Set(GROUPS.flatMap(([, names]) => names))
+  const sumOf = (rows: readonly { tokens: number }[]) => rows.reduce((sum, row) => sum + row.tokens, 0)
 
-  return `${windowLabelOf(limit.kind)}: ${used}%${reset === null ? '' : ` (se reinicia ${reset})`}`
+  return [
+    ...GROUPS.map(([name, names]) => [name, sumOf(used.filter(row => names.includes(row.name)))] as const),
+    ...used.filter(row => !grouped.has(row.name)).map(row => [row.name, row.tokens] as const),
+  ]
+    .filter(([, tokens]) => tokens > 0)
+    .sort(([, a], [, b]) => b - a)
+    .map(([name, tokens]) => `• ${name}: ${shortCount(tokens)} (${Math.round((tokens / total) * 100)}%)`)
 }
 
-/** The /ahorro report: where the window goes and what the session spent it on. */
+/** The three connectors whose loaded tools take the most room. */
+const heaviestConnectors = (tools: Breakdown['mcpTools']): string[] => {
+  const loaded = new Map<string, number>()
+
+  for (const tool of tools.filter(one => one.isLoaded)) {
+    loaded.set(tool.serverName, (loaded.get(tool.serverName) ?? 0) + tool.tokens)
+  }
+
+  return [...loaded]
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 3)
+    .map(([name, tokens]) => `${name} ${shortCount(tokens)}`)
+}
+
+const listed = (title: string, items: readonly string[]): string[] =>
+  items.length === 0 ? [] : [`${title}: ${items.join(' · ')}`]
+
+/**
+ * The /uso report: a bar for the context and each usage window, the cost, what fills the
+ * context, and what the conversation spent it on. Only lines the person can act on.
+ */
 export const reportOf = (
   usage: SessionUsage,
   breakdown: Breakdown | undefined,
   ledger: Ledger,
   nowMs: number,
 ): string => {
-  const repeated = Object.entries(ledger.fullReads).filter(([, times]) => times > 1)
+  const { context, cost, rateLimits } = usage
+  const figures = [
+    context.percent === undefined || context.tokens === undefined
+      ? `${'Contexto'.padEnd(REPORT_LABEL_WIDTH)}sin datos todavía`
+      : figureRow(
+          'Contexto',
+          context.percent,
+          `${shortCount(context.tokens)} de ${shortCount(context.window)} tokens`,
+        ),
+    ...rateLimits.map(limit => {
+      const reset = limit.resetsAt === undefined ? null : resetIn(limit.resetsAt, nowMs)
+
+      return figureRow(
+        WINDOW_NAMES[limit.kind] ?? limit.kind,
+        limit.percentUsed,
+        reset === null ? null : `se reinicia ${reset}`,
+      )
+    }),
+    ...(cost === undefined ? [] : [`Costo de la sesión: $${cost.usd.toFixed(2)}`]),
+  ]
+  const groups = breakdown === undefined ? [] : groupRows(breakdown.categories)
+  const repeated = Object.entries(ledger.fullReads)
+    .filter(([, times]) => times > 1)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 3)
   const spent = [
-    ...section(
-      'Límites de uso (última respuesta del modelo):',
-      usage.rateLimits.map(limit => limitRow(limit, nowMs)),
+    ...listed('Conectores más pesados', breakdown === undefined ? [] : heaviestConnectors(breakdown.mcpTools)),
+    ...listed(
+      'Salidas grandes',
+      [...ledger.bigOutputs]
+        .sort((a, b) => b.tokens - a.tokens)
+        .slice(0, 3)
+        .map(one => `${[one.tool, one.target].filter(Boolean).join(' ')} ~${shortCount(one.tokens)}`),
     ),
-    ...section(
-      'Salidas grandes en esta conversación (estimado):',
-      top(ledger.bigOutputs, one => one.tokens).map(
-        one => `${one.tool} ${one.target}: ~${formatCount(one.tokens)}`,
-      ),
-    ),
-    ...section(
-      'Archivos leídos enteros más de una vez:',
-      top(repeated, ([, times]) => times).map(([path, times]) => `${baseName(path)} ×${times}`),
+    ...listed(
+      'Releídos enteros',
+      repeated.map(([path, times]) => `${baseName(path)} ×${times}`),
     ),
   ]
 
-  if (breakdown === undefined) {
-    return [windowRow(usage), '', 'Desglose: sin datos en esta sesión.', ...spent].join('\n')
-  }
-
-  const used = breakdown.categories.filter(row => row.kind === 'used' && row.tokens > 0)
-  const skills = breakdown.skills
-
-  return [
-    windowRow(usage),
-    ...section(
-      'Qué ocupa lugar (tokens estimados):',
-      top(used, row => row.tokens).map(row => `${row.name}: ${formatCount(row.tokens)}`),
-    ),
-    ...section('Conectores con herramientas cargadas:', connectorRows(breakdown.mcpTools)),
-    ...(skills === undefined
-      ? []
-      : ['', `Skills: ${skills.includedSkills} listadas, ${formatCount(skills.tokens)}`]),
-    ...section(
-      'Archivos de memoria:',
-      top(breakdown.memoryFiles, file => file.tokens).map(
-        file => `${baseName(file.path)} (${file.type}): ${formatCount(file.tokens)}`,
-      ),
-    ),
-    ...spent,
-  ].join('\n')
+  return [figures, groups.length === 0 ? [] : ['Qué ocupa el contexto', ...groups], spent]
+    .filter(lines => lines.length > 0)
+    .map(lines => lines.join('\n'))
+    .join('\n\n')
 }

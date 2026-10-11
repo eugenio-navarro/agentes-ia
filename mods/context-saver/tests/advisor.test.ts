@@ -4,6 +4,7 @@ import {
   adviceFor,
   afterFill,
   barCellsFor,
+  barSvg,
   cutOf,
   estimateTokens,
   figuresOf,
@@ -12,6 +13,7 @@ import {
   offersClear,
   reportOf,
   resetIn,
+  shortCount,
   statusTextOf,
 } from '../hooks/advisor'
 import type { Signals } from '../types'
@@ -143,7 +145,7 @@ describe('figuresOf', () => {
     })
 
     expect(figures).toEqual({
-      context: { label: 'ctx', percent: 42, level: 'ok' },
+      context: { label: 'contexto', percent: 42, level: 'ok' },
       limits: [
         { label: '5h', percent: 30, level: 'ok' },
         { label: '7d', percent: 12, level: 'ok' },
@@ -204,62 +206,120 @@ describe('statusTextOf', () => {
   })
 })
 
+describe('shortCount', () => {
+  test('writes a token count the way people say it', () => {
+    expect([950, 12_345, 475_785, 999_600, 1_000_000, 1_250_000].map(shortCount)).toEqual([
+      '950',
+      '12k',
+      '476k',
+      '1M',
+      '1M',
+      '1,3M',
+    ])
+  })
+})
+
+describe('barSvg', () => {
+  test('draws a rounded track with the used part over it', () => {
+    const svg = barSvg(50, '#0f0', '#333', 120, 8)
+
+    expect(svg).toContain('width="120" height="8" rx="4" fill="#333"')
+    expect(svg).toContain('width="60" height="8" rx="4" fill="#0f0"')
+  })
+
+  test('keeps a small use visible as a round dot, fills at most the track, draws none at zero', () => {
+    expect(barSvg(1, '#0f0', '#333', 120, 8)).toContain('width="8" height="8" rx="4" fill="#0f0"')
+    expect(barSvg(250, '#0f0', '#333', 120, 8)).toContain('width="120" height="8" rx="4" fill="#0f0"')
+    expect(barSvg(0, '#0f0', '#333', 120, 8)).not.toContain('#0f0')
+  })
+})
+
 describe('reportOf', () => {
-  test('groups MCP tools by connector and lists what the session spent', () => {
-    const text = reportOf(
-      {
-        startedAt: 0,
-        context: { window: 200_000, tokens: 84_000, percent: 42 },
-        cost: { usd: 2 },
-        rateLimits: [
-          { kind: 'five_hour', percentUsed: 57, resetsAt: '2026-10-11T16:13:00Z' },
-          { kind: 'seven_day', percentUsed: 80.4 },
-        ],
-      },
-      {
-        categories: [
-          { name: 'Messages', tokens: 50_000, color: 'text', isDeferred: false, kind: 'used' },
-          { name: 'MCP tools', tokens: 9_000, color: 'text', isDeferred: false, kind: 'used' },
-          { name: 'Free space', tokens: 116_000, color: 'text', isDeferred: false, kind: 'free' },
-        ],
-        mcpTools: [
-          { name: 'mcp__figma__a', serverName: 'figma', tokens: 5_000, isLoaded: true },
-          { name: 'mcp__figma__b', serverName: 'figma', tokens: 3_000, isLoaded: true },
-          { name: 'mcp__gmail__a', serverName: 'gmail', tokens: 1_000, isLoaded: true },
-          { name: 'mcp__drive__a', serverName: 'drive', tokens: 700, isLoaded: false },
-        ],
-        memoryFiles: [{ path: 'C:/u/.claude/CLAUDE.md', type: 'User', tokens: 1_200 }],
-        skills: { totalSkills: 60, includedSkills: 55, tokens: 4_000, skillFrontmatter: [] },
-      },
+  const usage = {
+    startedAt: 0,
+    context: { window: 1_000_000, tokens: 475_785, percent: 48 },
+    cost: { usd: 16.45 },
+    rateLimits: [
+      { kind: 'five_hour', percentUsed: 90, resetsAt: '2026-10-11T15:11:00Z' },
+      { kind: 'seven_day', percentUsed: 84.6 },
+    ],
+  }
+  const row = (name: string, tokens: number, kind: 'used' | 'free' = 'used') => ({
+    name,
+    tokens,
+    color: 'text',
+    isDeferred: false,
+    kind,
+  })
+  const breakdown = {
+    categories: [
+      row('Messages', 400_000),
+      row('System tools', 30_000),
+      row('MCP tools', 20_000),
+      row('Skills', 10_000),
+      row('System prompt', 5_000),
+      row('Memory files', 5_000),
+      row('Free space', 500_000, 'free'),
+    ],
+    mcpTools: [
+      { name: 'mcp__browser__a', serverName: 'browser', tokens: 6_000, isLoaded: true },
+      { name: 'mcp__browser__b', serverName: 'browser', tokens: 5_000, isLoaded: true },
+      { name: 'mcp__gmail__a', serverName: 'gmail', tokens: 1_000, isLoaded: true },
+      { name: 'mcp__drive__a', serverName: 'drive', tokens: 9_000, isLoaded: false },
+    ],
+  }
+  const QUIET = { bigOutputs: [], fullReads: {} }
+
+  test('opens with one bar per figure: context, each usage window, then the cost', () => {
+    const lines = reportOf(usage, breakdown, QUIET, NOW).split('\n')
+
+    expect(lines.slice(0, 4)).toEqual([
+      'Contexto  ██████████░░░░░░░░░░  48% · 476k de 1M tokens',
+      '5 horas   ██████████████████░░  90% · se reinicia en 1 h 11 min',
+      '7 días    █████████████████░░░  85%',
+      'Costo de la sesión: $16.45',
+    ])
+  })
+
+  test('groups what fills the context under four plain names, largest first', () => {
+    const text = reportOf(usage, breakdown, QUIET, NOW)
+
+    expect(text).toContain(
+      [
+        'Qué ocupa el contexto',
+        '• Conversación: 400k (85%)',
+        '• Herramientas: 50k (11%)',
+        '• Skills: 10k (2%)',
+        '• Instrucciones y memoria: 10k (2%)',
+      ].join('\n'),
+    )
+    expect(text).not.toContain('Free space')
+  })
+
+  test('names the heaviest loaded connectors, and what the conversation spent only when it did', () => {
+    const quiet = reportOf(usage, breakdown, QUIET, NOW)
+    expect(quiet).toContain('Conectores más pesados: browser 11k · gmail 1k')
+    expect(quiet).not.toContain('drive')
+    expect(quiet).not.toContain('Salidas grandes')
+    expect(quiet).not.toContain('Releídos')
+
+    const busy = reportOf(
+      usage,
+      breakdown,
       {
         bigOutputs: [{ tool: 'Read', target: 'big.ts', tokens: 12_000 }],
         fullReads: { 'C:/p/a.ts': 3, 'C:/p/b.ts': 1 },
       },
       NOW,
     )
-
-    expect(text).toContain('84.000 de 200.000 tokens (42%)')
-    expect(text).toContain('5h: 57% (se reinicia en 2 h 13 min)')
-    expect(text).toContain('7d: 80,4%')
-    expect(text).toContain('Messages: 50.000')
-    expect(text).not.toContain('Free space')
-    expect(text).toContain('figma: 8.000 (2 herramientas)')
-    expect(text).toContain('1 conector con esquemas diferidos')
-    expect(text).toContain('Skills: 55 listadas, 4.000')
-    expect(text).toContain('CLAUDE.md (User): 1.200')
-    expect(text).toContain('Read big.ts: ~12.000')
-    expect(text).toContain('a.ts ×3')
-    expect(text).not.toContain('b.ts')
+    expect(busy).toContain('Salidas grandes: Read big.ts ~12k')
+    expect(busy).toContain('Releídos enteros: a.ts ×3')
+    expect(busy).not.toContain('b.ts')
   })
 
-  test('says so when the engine gave no breakdown', () => {
-    const text = reportOf(
-      { startedAt: 0, context: { window: 200_000 }, rateLimits: [] },
-      undefined,
-      { bigOutputs: [], fullReads: {} },
-      NOW,
-    )
+  test('says so in one line when the engine has no reading yet', () => {
+    const text = reportOf({ startedAt: 0, context: { window: 200_000 }, rateLimits: [] }, undefined, QUIET, NOW)
 
-    expect(text).toContain('sin datos')
+    expect(text).toBe('Contexto  sin datos todavía')
   })
 })

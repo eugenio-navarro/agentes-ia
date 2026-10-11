@@ -119,10 +119,17 @@ test('draws context and cost in the band above the prompt after a turn', async (
     expect(await ui.find({ type: 'Text', text: /^42%$/ }), 'before a turn').toBe(undefined)
 
     await endTurn($)
-    expect((await ui.find({ type: 'Text', text: /^ctx$/ }))?.props).toMatchObject({ color: '#9ca3af' })
+    expect((await ui.find({ type: 'Text', text: /^contexto$/ }))?.props).toMatchObject({ color: '#9ca3af' })
     expect((await ui.find({ type: 'Text', text: /^42%$/ }))?.props).toMatchObject({ bold: true })
-    expect((await ui.find({ type: 'Text', text: /^━{3}$/ }))?.props, 'used').toMatchObject({ color: '#4ade80' })
-    expect((await ui.find({ type: 'Text', text: /^━{5}$/ }))?.props, 'left').toMatchObject({ color: '#4b5563' })
+    if (surface === 'terminal') {
+      const texts = await ui.findAll({ type: 'Text' })
+      expect(texts.find(one => one.text === '███')?.props, 'used').toMatchObject({ color: '#4ade80' })
+      expect(texts.find(one => one.text === '█████')?.props, 'left').toMatchObject({ color: '#4b5563' })
+    } else {
+      const bar = await ui.find({ type: 'Svg' })
+      expect(String(bar?.props.source), 'a rounded bar').toContain('rx="4" fill="#4ade80"')
+      expect(bar?.props).toMatchObject({ alt: '42%', width: 120, height: 8 })
+    }
     expect(await ui.find({ type: 'Text', text: '$1.50' })).toBeDefined()
     expect(await ui.find({ key: 'compact' }), 'no advice at 42%').toBe(undefined)
     await ui.unmount()
@@ -138,9 +145,10 @@ test('colours the gauges by level', async ($, on) => {
   await endTurn($)
 
   const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
-  const colours = (await ui.findAll({ type: 'Text', text: /^━+$/ })).map(bar => bar.props.color)
-  expect(colours).toEqual(expect.arrayContaining(['#f87171', '#fbbf24']))
-  expect((await ui.find({ type: 'Text', text: /^ctx$/ }))?.props, 'danger colours the label').toMatchObject({
+  const bars = (await ui.findAll({ type: 'Svg' })).map(bar => String(bar.props.source))
+  expect(bars.some(source => source.includes('#f87171')), 'a danger bar').toBe(true)
+  expect(bars.some(source => source.includes('#fbbf24')), 'a warn bar').toBe(true)
+  expect((await ui.find({ type: 'Text', text: /^contexto$/ }))?.props, 'danger colours the label').toMatchObject({
     color: '#f87171',
   })
   expect((await ui.find({ type: 'Text', text: /^85%$/ }))?.props).toMatchObject({ color: '#f87171', bold: true })
@@ -152,7 +160,7 @@ test('uses the status line only where the band is not drawn', async ($, on) => {
   const world = worldOf(on, 42)
 
   await endTurn($)
-  expect(world.statuses.at(-1), 'no band yet').toBe('ctx 42% · $1.50')
+  expect(world.statuses.at(-1), 'no band yet').toBe('contexto 42% · $1.50')
 
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
   await endTurn($)
@@ -352,21 +360,21 @@ test('announces a rate-limit window near its cap once', async ($, on) => {
   expect((await ui.find({ type: 'Text', text: /^83%$/ }))?.props).toMatchObject({ color: '#f87171' })
 })
 
-test('/ahorro reports the context and what the session spent', async ($, on) => {
+test('/uso reports the context and what the session spent', async ($, on) => {
   const world = worldOf(on, 42)
 
   await $.session.start({ cwd: 'C:/p', surface: 'terminal', isInteractive: true })
   world.output = 'x'.repeat(48_000)
   await read($, 'C:/p/big.ts')
   const ran = await $.command.run({
-    command: 'ahorro',
+    command: 'uso',
     args: '',
     origin: { kind: 'composer' },
     presentation: { isFullscreen: false, columns: 80 },
   })
 
-  expect(ran.text).toContain('84.000 de 200.000 tokens (42%)')
-  expect(ran.text).toContain('Read big.ts: ~12.000')
+  expect(ran.text).toContain('42% · 84k de 200k tokens')
+  expect(ran.text).toContain('Salidas grandes: Read big.ts ~12k')
 })
 
 test('starts over after a compaction and after /clear', async ($, on) => {
