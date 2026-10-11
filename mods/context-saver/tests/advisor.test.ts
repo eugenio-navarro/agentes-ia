@@ -184,7 +184,8 @@ describe('reportBlocks', () => {
       'Qué ocupa el contexto',
       '• Instrucciones y memoria: 10k (2%)',
       '',
-      'Conectores más pesados: browser 11k · gmail 1k',
+      'Detalle del gasto',
+      '• Conectores más pesados: browser 11k · gmail 1k',
     ].join('\n')
 
     expect(reportBlocks(text)).toEqual([
@@ -193,7 +194,8 @@ describe('reportBlocks', () => {
       { kind: 'fact', label: 'Precio de la sesión', value: '$16.45' },
       { kind: 'title', text: 'Qué ocupa el contexto' },
       { kind: 'share', label: 'Instrucciones y memoria', amount: '10k', percent: 2 },
-      { kind: 'fact', label: 'Conectores más pesados', value: 'browser 11k · gmail 1k' },
+      { kind: 'title', text: 'Detalle del gasto' },
+      { kind: 'detail', label: 'Conectores más pesados', value: 'browser 11k · gmail 1k' },
     ])
   })
 
@@ -445,7 +447,7 @@ describe('reportOf', () => {
 
   test('names the heaviest loaded connectors, and what the conversation spent only when it did', () => {
     const quiet = reportOf(usage, breakdown, QUIET, NOW)
-    expect(quiet).toContain('Conectores más pesados: browser 11k · gmail 1k')
+    expect(quiet.endsWith('\n\nDetalle del gasto\n• Conectores más pesados: browser 11k · gmail 1k'), 'a part of its own, with its title').toBe(true)
     expect(quiet).not.toContain('drive')
     expect(quiet).not.toContain('Salidas grandes')
     expect(quiet).not.toContain('Releídos')
@@ -460,8 +462,9 @@ describe('reportOf', () => {
       },
       NOW,
     )
-    expect(busy).toContain('Salidas grandes: Read big.ts ~12k')
-    expect(busy).toContain('Releídos enteros: a.ts ×3')
+    expect(busy).toContain('\n• Salidas grandes: Read big.ts ~12k')
+    expect(busy).toContain('\n• Releídos enteros: a.ts ×3')
+    expect(busy.split('Detalle del gasto').length, 'one title for the whole part').toBe(2)
     expect(busy).not.toContain('b.ts')
   })
 
@@ -474,6 +477,6 @@ describe('reportOf', () => {
   test('writes only lines the transcript knows how to draw', () => {
     const kinds = reportBlocks(reportOf(usage, breakdown, QUIET, NOW)).map(block => block.kind)
 
-    expect(kinds).toEqual(['figure', 'figure', 'figure', 'fact', 'title', 'share', 'share', 'share', 'share', 'fact'])
+    expect(kinds).toEqual(['figure', 'figure', 'figure', 'fact', 'title', 'share', 'share', 'share', 'share', 'title', 'detail'])
   })
 })

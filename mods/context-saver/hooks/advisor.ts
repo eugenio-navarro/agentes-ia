@@ -45,6 +45,8 @@ export const LIMITS = {
   /** The bars of the /uso report: in pixels where drawn as vectors, in cells as text. */
   reportBarPx: 120,
   reportBarCells: 20,
+  /** The column the labels under a title of the report take, so its rows start together. */
+  reportLabelCells: 28,
 } as const
 
 export const COMPACT_INSTRUCTIONS =
@@ -367,6 +369,7 @@ export const shortCount = (count: number): string => {
 
 const REPORT_BAR_CELLS = LIMITS.reportBarCells
 const CONTEXT_TITLE = 'Qué ocupa el contexto'
+const DETAIL_TITLE = 'Detalle del gasto'
 const REPORT_LABEL_WIDTH = 10
 const WINDOW_NAMES: Readonly<Record<string, string>> = { five_hour: '5 horas', seven_day: '7 días' }
 
@@ -418,7 +421,7 @@ const heaviestConnectors = (tools: Breakdown['mcpTools']): string[] => {
 }
 
 const listed = (title: string, items: readonly string[]): string[] =>
-  items.length === 0 ? [] : [`${title}: ${items.join(' · ')}`]
+  items.length === 0 ? [] : [`• ${title}: ${items.join(' · ')}`]
 
 /** The level a share of a limit is drawn at: the same thresholds the gauges use. */
 export const levelFor = (percent: number): Level =>
@@ -429,11 +432,13 @@ export type ReportBlock =
   | { kind: 'figure'; label: string; percent: number; detail: string | null }
   | { kind: 'share'; label: string; percent: number; amount: string }
   | { kind: 'fact'; label: string; value: string }
+  | { kind: 'detail'; label: string; value: string }
   | { kind: 'title'; text: string }
   | { kind: 'note'; text: string }
 
 const FIGURE_LINE = /^(.+?)\s+[█░]+\s+(\d+)%(?: · (.*))?$/
 const SHARE_LINE = /^• (.+): (\S+) \((\d+)%\)$/
+const DETAIL_LINE = /^• ([^:]+): (.+)$/
 const FACT_LINE = /^([^:]+): (.+)$/
 
 /**
@@ -463,18 +468,27 @@ export const reportBlocks = (text: string): ReportBlock[] =>
         return { kind: 'share', label: share[1] ?? '', amount: share[2] ?? '', percent: Number(share[3]) }
       }
 
+      const detail = DETAIL_LINE.exec(line)
+
+      if (detail !== null) {
+        return { kind: 'detail', label: detail[1] ?? '', value: detail[2] ?? '' }
+      }
+
       const fact = FACT_LINE.exec(line)
 
       if (fact !== null) {
         return { kind: 'fact', label: fact[1] ?? '', value: fact[2] ?? '' }
       }
 
-      return line === CONTEXT_TITLE ? { kind: 'title', text: line } : { kind: 'note', text: line }
+      return line === CONTEXT_TITLE || line === DETAIL_TITLE
+        ? { kind: 'title', text: line }
+        : { kind: 'note', text: line }
     })
 
 /**
  * The /uso report: a bar for the context and each usage window, the cost, what fills the
- * context, and what the conversation spent it on. Only lines the person can act on.
+ * context, and what the conversation spent it on. Only lines the person can act on, and
+ * every part after the first under a title of its own.
  */
 export const reportOf = (
   usage: SessionUsage,
@@ -523,11 +537,15 @@ export const reportOf = (
     ...(ledger.classifier.asked === 0
       ? []
       : [
-          `Detección de cambio de tema: ${ledger.classifier.asked} ${ledger.classifier.asked === 1 ? 'consulta' : 'consultas'}, ${formatCount(ledger.classifier.tokens)} tokens`,
+          `• Detección de cambio de tema: ${ledger.classifier.asked} ${ledger.classifier.asked === 1 ? 'consulta' : 'consultas'}, ${formatCount(ledger.classifier.tokens)} tokens`,
         ]),
   ]
 
-  return [figures, groups.length === 0 ? [] : [CONTEXT_TITLE, ...groups], spent]
+  return [
+    figures,
+    groups.length === 0 ? [] : [CONTEXT_TITLE, ...groups],
+    spent.length === 0 ? [] : [DETAIL_TITLE, ...spent],
+  ]
     .filter(lines => lines.length > 0)
     .map(lines => lines.join('\n'))
     .join('\n\n')

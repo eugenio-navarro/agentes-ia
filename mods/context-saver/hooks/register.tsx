@@ -524,12 +524,21 @@ export const register: Register = on => {
             case 'figure':
               return row(block.label, 10, block.percent, LEVEL_COLORS[levelFor(block.percent)], block.detail)
             case 'share':
-              return row(block.label, 26, block.percent, MUTED, block.amount)
+              return row(block.label, LIMITS.reportLabelCells, block.percent, MUTED, block.amount)
             case 'fact':
               return (
                 <Box columnGap={1}>
                   <Text color={MUTED}>{block.label}</Text>
                   <Text bold>{block.value}</Text>
+                </Box>
+              )
+            case 'detail':
+              return (
+                <Box columnGap={1}>
+                  <Box width={LIMITS.reportLabelCells} flexShrink={0}>
+                    <Text color={MUTED}>{block.label}</Text>
+                  </Box>
+                  <Text>{block.value}</Text>
                 </Box>
               )
             case 'title':

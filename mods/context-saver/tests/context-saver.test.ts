@@ -524,6 +524,9 @@ test("draws the /uso report in the transcript with the band's bars, a title per 
     '',
     'Qué ocupa el contexto',
     '• Conversación: 400k (85%)',
+    '',
+    'Detalle del gasto',
+    '• Conectores más pesados: browser 11k',
   ].join('\n')
 
   for (const surface of SURFACES) {
@@ -534,7 +537,17 @@ test("draws the /uso report in the transcript with the band's bars, a title per 
       props: { command: 'uso', args: '', text, isErrored: false },
     })
     const bold = (await ui.findAll({ type: 'Text' })).filter(one => one.props.bold === true).map(one => one.text)
-    expect(bold).toEqual(expect.arrayContaining(['Uso', 'Qué ocupa el contexto', '48%', '85%', '$16.45']))
+    expect(bold).toEqual(
+      expect.arrayContaining(['Uso', 'Qué ocupa el contexto', 'Detalle del gasto', '48%', '85%', '$16.45']),
+    )
+
+    const texts = await ui.findAll({ type: 'Text' })
+    const labelOf = (text: string) => texts.find(one => one.text === text)?.props
+    expect(labelOf('Conectores más pesados'), 'a detail reads as the rows above it').toMatchObject(
+      labelOf('Conversación') ?? {},
+    )
+    expect(labelOf('Conectores más pesados')).toMatchObject({ color: '#9ca3af' })
+    expect(texts.map(one => one.text)).toContain('browser 11k')
 
     const bars = (await ui.findAll({ type: 'Svg' })).map(one => String(one.props.source))
     expect(bars.length, 'vector bars only where the surface draws them').toBe(surface === 'terminal' ? 0 : 3)
