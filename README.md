@@ -40,6 +40,7 @@ Todos siguen [FILOSOFIA.md](FILOSOFIA.md). Cada proyecto puede ajustarla en su `
 | `FILOSOFIA.md` | Cómo se trabaja: principios, diseño, calidad y seguridad |
 | `agents/` | Un archivo por agente: configuración (modelo, permisos) + prompt |
 | `hooks/` | Scripts automáticos: el guard que impone los límites de cada rol y el formateador del engineer |
+| `mods/` | Mods de Claude Code (cambios a su interfaz y comportamiento), cada uno con sus tests. Hoy: `context-saver` |
 | `extra/BITACORA.md` | Decisiones, limitaciones y fallas encontradas (lo mantiene la IA) |
 | `extra/INSTALAR.md` | Instrucciones para que una IA instale el equipo |
 | `extra/instalar_claude_code.py` | Instala o actualiza el equipo en Claude Code (`~/.claude`) a partir del repo |
@@ -51,3 +52,17 @@ Todos siguen [FILOSOFIA.md](FILOSOFIA.md). Cada proyecto puede ajustarla en su `
 Para instalar o actualizar en Claude Code, desde la raíz del repo: `git pull` y
 `python extra/instalar_claude_code.py` (detalles en `extra/INSTALAR.md`). Para otra herramienta,
 pedile a tu IA: *"Instalá los agentes siguiendo extra/INSTALAR.md"*.
+
+## Mods
+
+Claude Code lee los mods directo de `mods/`, así que un cambio ahí se carga al recargar los plugins.
+Para instalarlos en una máquina nueva, desde la raíz del repo:
+
+```bash
+claude plugin marketplace add ./mods
+claude plugin install context-saver@claude-mods
+```
+
+Para probar un mod: `claude plugin validate mods/context-saver` y `claude plugin test mods/context-saver`.
+Después de editarlo, subí la versión en su `plugin.json`, corré
+`claude plugin update context-saver@claude-mods` y recargá los plugins (`/reload-plugins`) o reiniciá la app.
