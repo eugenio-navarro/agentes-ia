@@ -2,6 +2,7 @@ import { describe, expect, test } from 'claude-code/testing'
 
 import {
   adviceFor,
+  agentNoted,
   barCellsFor,
   barSvg,
   commandFor,
@@ -141,6 +142,7 @@ describe('state kept from an earlier version', () => {
       fullReads: {},
       prompts: [],
       classifier: { asked: 0, tokens: 0 },
+      agents: { ids: [], tokens: 0 },
       windows: [],
     })
     expect(reportOf({ startedAt: 0, context: { window: 200_000 }, rateLimits: [] }, undefined, ledger, 0)).toContain('Salidas grandes')
@@ -149,6 +151,7 @@ describe('state kept from an earlier version', () => {
   test('starts from the defaults when nothing is stored', () => {
     expect(signalsFrom(undefined)).toEqual({ percent: null, cut: null, pause: 'none', hidden: null, topic: null })
     expect(ledgerFrom(null).classifier).toEqual({ asked: 0, tokens: 0 })
+    expect(ledgerFrom({ bigOutputs: [] }).agents, 'state saved before agents were counted').toEqual({ ids: [], tokens: 0 })
   })
 })
 
@@ -172,6 +175,22 @@ describe('windowsShown', () => {
       week,
     ])
     expect(windowsShown([], [week], AT + 3 * 60_000), 'no reset time known').toEqual([week])
+  })
+})
+
+describe('agentNoted', () => {
+  const usage = { input_tokens: 1000, output_tokens: 200, cache_read_input_tokens: 3000, cache_creation_input_tokens: 800 }
+
+  test('counts an agent once however many turns it runs, and adds up every token its turns processed', () => {
+    const once = agentNoted({ ids: [], tokens: 0 }, 'a1', usage)
+    const twice = agentNoted(once, 'a1', usage)
+
+    expect(once).toEqual({ ids: ['a1'], tokens: 5000 })
+    expect(twice).toEqual({ ids: ['a1'], tokens: 10_000 })
+  })
+
+  test('counts an agent whose turn reported no usage, with no tokens', () => {
+    expect(agentNoted({ ids: ['a1'], tokens: 5000 }, 'a2', undefined)).toEqual({ ids: ['a1', 'a2'], tokens: 5000 })
   })
 })
 
@@ -426,7 +445,14 @@ describe('reportOf', () => {
       { name: 'mcp__drive__a', serverName: 'drive', tokens: 9_000, isLoaded: false },
     ],
   }
-  const QUIET = { bigOutputs: [], fullReads: {}, prompts: [], classifier: { asked: 0, tokens: 0 }, windows: [] }
+  const QUIET = {
+    bigOutputs: [],
+    fullReads: {},
+    prompts: [],
+    classifier: { asked: 0, tokens: 0 },
+    agents: { ids: [], tokens: 0 },
+    windows: [],
+  }
 
   test('opens with one bar per figure: context, each usage window, then the cost', () => {
     const lines = reportOf(usage, breakdown, QUIET, NOW).split('\n')
@@ -475,6 +501,13 @@ describe('reportOf', () => {
     expect(busy).toContain('\n• Releídos enteros: a.ts ×3')
     expect(busy.split('Detalle del gasto').length, 'one title for the whole part').toBe(2)
     expect(busy).not.toContain('b.ts')
+  })
+
+  test('says how many agents were launched and what they processed, only when there were any', () => {
+    expect(reportOf(usage, breakdown, QUIET, NOW)).not.toContain('Agentes')
+
+    const busy = reportOf(usage, breakdown, { ...QUIET, agents: { ids: ['a1', 'a2'], tokens: 412_300 } }, NOW)
+    expect(busy).toContain('\n• Agentes lanzados: 2 · 412k tokens procesados')
   })
 
   test('says so in one line when the engine has no reading yet', () => {

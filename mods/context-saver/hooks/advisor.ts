@@ -64,6 +64,7 @@ export const EMPTY_LEDGER: Ledger = {
   fullReads: {},
   prompts: [],
   classifier: { asked: 0, tokens: 0 },
+  agents: { ids: [], tokens: 0 },
   windows: [],
 }
 
@@ -427,6 +428,34 @@ const listed = (title: string, items: readonly string[]): string[] =>
 export const levelFor = (percent: number): Level =>
   percent >= LIMITS.urgentAt ? 'danger' : percent >= LIMITS.compactAt ? 'warn' : 'ok'
 
+/**
+ * The agents count after one of an agent's turns: an agent counts once however many turns
+ * it runs, and its tokens are all the turn processed, cached or not; a turn that reports
+ * no usage adds none.
+ */
+export const agentNoted = (
+  agents: Ledger['agents'],
+  id: string,
+  usage:
+    | {
+        input_tokens: number
+        output_tokens: number
+        cache_read_input_tokens: number
+        cache_creation_input_tokens: number
+      }
+    | undefined,
+): Ledger['agents'] => ({
+  ids: agents.ids.includes(id) ? agents.ids : [...agents.ids, id],
+  tokens:
+    agents.tokens +
+    (usage === undefined
+      ? 0
+      : usage.input_tokens +
+        usage.output_tokens +
+        usage.cache_read_input_tokens +
+        usage.cache_creation_input_tokens),
+})
+
 /** A command's text without the plugin's name the engine puts before it where it shows it. */
 export const withoutName = (text: string, plugin: string): string =>
   text.startsWith(`${plugin}: `) ? text.slice(plugin.length + 2) : text
@@ -538,6 +567,11 @@ export const reportOf = (
       'Releídos enteros',
       repeated.map(([path, times]) => `${baseName(path)} ×${times}`),
     ),
+    ...(ledger.agents.ids.length === 0
+      ? []
+      : [
+          `• Agentes lanzados: ${ledger.agents.ids.length} · ${shortCount(ledger.agents.tokens)} tokens procesados`,
+        ]),
     ...(ledger.classifier.asked === 0
       ? []
       : [

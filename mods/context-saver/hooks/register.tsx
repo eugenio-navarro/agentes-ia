@@ -8,6 +8,7 @@ import {
   QUIET_SIGNALS,
   TOPIC_SYSTEM,
   adviceFor,
+  agentNoted,
   barCellsFor,
   barSvg,
   clipPrompt,
@@ -125,10 +126,12 @@ const noteEdit = async ($: EngineInterface, e: ToolCallInput) => {
 const startOver = async ($: EngineInterface) => {
   stopPauseTimers()
   await update($, signals, () => QUIET)
-  // What the detection spent is the session's, not the conversation's: it outlives a compaction.
+  // What the detection and the agents spent is the session's, not the conversation's: it
+  // outlives a compaction.
   await update($, ledger, now => ({
     ...EMPTY,
     classifier: ledgerFrom(now).classifier,
+    agents: ledgerFrom(now).agents,
     windows: ledgerFrom(now).windows,
   }))
   await update($, figures, () => null)
@@ -352,7 +355,15 @@ export const register: Register = on => {
   on('turn.complete', async ($, e, next) => {
     const done = await next(e)
 
-    if (e.agentId !== undefined) {
+    const { agentId, usage } = e
+
+    if (agentId !== undefined) {
+      // A subagent's turn: its tokens never show in this conversation's context, only here.
+      await update($, ledger, now => ({
+        ...ledgerFrom(now),
+        agents: agentNoted(ledgerFrom(now).agents, agentId, usage),
+      }))
+
       return done
     }
 

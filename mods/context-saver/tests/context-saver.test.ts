@@ -515,6 +515,49 @@ test('/uso says what the detection itself spent', async ($, on) => {
   expect(ran.text).toContain('Detección de cambio de tema: 1 consulta del mod a Haiku · 302 tokens')
 })
 
+test('/uso counts the agents launched and what they processed, and keeps the count after a compaction', async ($, on) => {
+  worldOf(on, 50)
+  const usage = {
+    input_tokens: 1000,
+    output_tokens: 200,
+    cache_read_input_tokens: 3000,
+    cache_creation_input_tokens: 800,
+    model: 'claude-haiku-5-5',
+  }
+  const agentTurn = (agentId: string, spent?: typeof usage) =>
+    $.turn.complete({
+      answer: 'done',
+      durationMs: 1,
+      isAborted: false,
+      turnId: 't2',
+      reason: 'answer',
+      agentId,
+      ...(spent === undefined ? {} : { usage: spent }),
+    })
+  const report = async () =>
+    (
+      await $.command.run({
+        command: 'uso',
+        args: '',
+        origin: { kind: 'composer' },
+        presentation: { isFullscreen: false, columns: 80 },
+      })
+    ).text
+
+  await $.session.start({ cwd: 'C:/p', surface: 'terminal', isInteractive: true })
+  await endTurn($)
+  expect(await report(), 'the main loop is no agent').not.toContain('Agentes')
+
+  await agentTurn('a1', usage)
+  await agentTurn('a1', usage)
+  await agentTurn('a2')
+  expect(await report()).toContain('Agentes lanzados: 2 · 10k tokens procesados')
+
+  await $.session.compact({ trigger: 'manual', messages: SUMMARY })
+  await endTurn($)
+  expect(await report(), 'the session spent it, not the conversation').toContain('Agentes lanzados: 2')
+})
+
 test("draws the /uso report in the transcript with the band's bars, a title per part and one row per figure", async ($, on) => {
   worldOf(on, 20)
   // As the engine hands it over: the plugin's name before what the command answered.

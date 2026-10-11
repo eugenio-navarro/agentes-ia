@@ -31,6 +31,8 @@ export type Ledger = {
   prompts: string[]
   /** How often the small model was asked about a change of subject, and what that cost. */
   classifier: { asked: number; tokens: number }
+  /** The subagents launched so far, by id, and every token their turns processed. */
+  agents: { ids: string[]; tokens: number }
   /** The usage windows seen so far, so one the engine leaves out stays on screen. */
   windows: { kind: string; percentUsed: number; resetsAt?: string }[]
 }
