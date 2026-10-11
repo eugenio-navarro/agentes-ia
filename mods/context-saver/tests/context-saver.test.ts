@@ -213,6 +213,22 @@ const buttonsOf = async (ui: {
   findAll(query: { type: string }): Promise<{ key: string | undefined }[]>
 }) => (await ui.findAll({ type: 'Button' })).map(button => button.key)
 
+test('spreads the row from edge to edge of the band, with or without the buttons', async ($, on) => {
+  const world = worldOf(on, 42)
+  const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
+  const row = async () => (await ui.findAll({ type: 'Box' }))[0]?.props
+  const spread = { width: '100%', justifyContent: 'space-between' }
+
+  await endTurn($)
+  expect(await buttonsOf(ui), 'no buttons').toEqual([])
+  expect(await row()).toMatchObject(spread)
+
+  world.usage = usageAt(85)
+  await endTurn($)
+  expect(await buttonsOf(ui), 'with buttons').toEqual(['compact', 'ignore'])
+  expect(await row()).toMatchObject(spread)
+})
+
 test('stays quiet under 40%, whatever happened', async ($, on) => {
   const { clock } = worldOf(on, 30)
 

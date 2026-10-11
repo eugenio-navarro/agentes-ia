@@ -443,11 +443,12 @@ export const register: Register = on => {
       )
     }
 
-    // Nothing in the row shrinks, so a narrow band wraps it instead of drawing one part over another.
+    // Nothing in the row shrinks, so a narrow band wraps it instead of drawing one part over another;
+    // and what room is left goes between its parts, so it reaches both edges with or without buttons.
     // One row: the gauges, then, only when there is something to recommend, the command
     // itself as the one button to press, and Ignorar beside it.
     return (
-      <Box columnGap={2} alignItems="center" flexWrap="wrap">
+      <Box columnGap={2} alignItems="center" flexWrap="wrap" width="100%" justifyContent="space-between">
         {gauge(shown.context)}
         {shown.limits.map(limit => gauge(limit))}
         {shown.cost !== null && (
