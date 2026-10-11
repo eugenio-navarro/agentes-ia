@@ -255,7 +255,7 @@ export const register: Register = on => {
 
   on('prompt.submit', async ($, e, next) => {
     stopPauseTimers()
-    await update($, signals, now => ({
+    await update($, signals, (now): Signals => ({
       ...now,
       cut: null,
       pause: 'none',
