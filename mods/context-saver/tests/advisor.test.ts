@@ -195,7 +195,7 @@ describe('statusTextOf', () => {
       cost: '$1.23',
     })
 
-    expect(text).toBe('ctx 42% · 5h 57% · $1.23')
+    expect(text).toBe('ctx 42% · 5h 57% · Precio: $1.23')
     expect(statusTextOf(null)).toBe(undefined)
   })
 })
@@ -271,7 +271,7 @@ describe('reportOf', () => {
       'Contexto  ██████████░░░░░░░░░░  48% · 476k de 1M tokens',
       '5 horas   ██████████████████░░  90% · se reinicia en 1 h 11 min',
       '7 días    █████████████████░░░  85%',
-      'Costo de la sesión: $16.45',
+      'Precio de la sesión: $16.45',
     ])
   })
 

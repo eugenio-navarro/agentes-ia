@@ -130,7 +130,7 @@ test('draws context and cost in the band above the prompt after a turn', async (
       expect(String(bar?.props.source), 'a rounded bar').toContain('rx="4" fill="#4ade80"')
       expect(bar?.props).toMatchObject({ alt: '42%', width: 120, height: 8 })
     }
-    expect(await ui.find({ type: 'Text', text: '$1.50' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: 'Precio: $1.50' })).toBeDefined()
     expect(await ui.find({ key: 'compact' }), 'no advice at 42%').toBe(undefined)
     await ui.unmount()
 
@@ -160,7 +160,7 @@ test('uses the status line only where the band is not drawn', async ($, on) => {
   const world = worldOf(on, 42)
 
   await endTurn($)
-  expect(world.statuses.at(-1), 'no band yet').toBe('contexto 42% · $1.50')
+  expect(world.statuses.at(-1), 'no band yet').toBe('contexto 42% · Precio: $1.50')
 
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
   await endTurn($)

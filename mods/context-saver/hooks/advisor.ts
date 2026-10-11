@@ -151,7 +151,7 @@ export const statusTextOf = (figures: Figures | null): string | undefined =>
     ? undefined
     : [figures.context, ...figures.limits]
         .map(gauge => `${gauge.label} ${gauge.percent}%`)
-        .concat(figures.cost ?? [])
+        .concat(figures.cost === null ? [] : [`Precio: ${figures.cost}`])
         .join(' · ')
 
 /** How long until `iso`, in its two largest units; null for a date that does not parse. */
@@ -301,7 +301,7 @@ export const reportOf = (
         reset === null ? null : `se reinicia ${reset}`,
       )
     }),
-    ...(cost === undefined ? [] : [`Costo de la sesión: $${cost.usd.toFixed(2)}`]),
+    ...(cost === undefined ? [] : [`Precio de la sesión: $${cost.usd.toFixed(2)}`]),
   ]
   const groups = breakdown === undefined ? [] : groupRows(breakdown.categories)
   const repeated = Object.entries(ledger.fullReads)

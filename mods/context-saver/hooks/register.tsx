@@ -368,7 +368,7 @@ export const register: Register = on => {
       <Box columnGap={3} alignItems="center">
         {gauge(shown.context)}
         {shown.limits.map(limit => gauge(limit))}
-        {shown.cost !== null && <Text color={MUTED}>{shown.cost}</Text>}
+        {shown.cost !== null && <Text color={MUTED}>{`Precio: ${shown.cost}`}</Text>}
         {kind !== null && command !== null && (
           <Box columnGap={1}>
             <Button
