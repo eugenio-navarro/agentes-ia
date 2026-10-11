@@ -1,4 +1,4 @@
-import type { SessionContextBreakdown, SessionUsage } from 'claude-code'
+import type { SessionContextBreakdown, SessionRateLimit, SessionUsage } from 'claude-code'
 
 import type { AdviceKind, Cut, Figures, Gauge, Ledger, Pause, Signals } from '../types'
 
@@ -32,7 +32,7 @@ export const LIMITS = {
   /** How often the band re-reads the engine's figures while nothing else does. */
   refreshMs: 60_000,
   /** The size of a gauge's bar where the surface draws vectors, in CSS pixels. */
-  barWidthPx: 80,
+  barWidthPx: 56,
   barHeightPx: 8,
 } as const
 
@@ -51,6 +51,7 @@ export const EMPTY_LEDGER: Ledger = {
   fullReads: {},
   prompts: [],
   classifier: { asked: 0, tokens: 0 },
+  windows: [],
 }
 
 /**
@@ -66,6 +67,32 @@ export const ledgerFrom = (stored: Partial<Ledger> | null | undefined): Ledger =
   ...EMPTY_LEDGER,
   ...stored,
 })
+
+/**
+ * The usage windows to show: those the engine reports now, in the order first seen, and any
+ * it reported before and has left out since. The engine drops a window once it resets, so a
+ * remembered one reads as it was until its reset time and 0% after it: it never disappears.
+ */
+export const windowsShown = (
+  reported: readonly SessionRateLimit[],
+  remembered: readonly SessionRateLimit[],
+  nowMs: number,
+): SessionRateLimit[] => {
+  const kinds = [...new Set([...remembered, ...reported].map(one => one.kind))]
+
+  return kinds.flatMap(kind => {
+    const now = reported.find(one => one.kind === kind)
+    const last = remembered.find(one => one.kind === kind)
+
+    if (now !== undefined || last === undefined) {
+      return now ?? []
+    }
+
+    const hasReset = last.resetsAt !== undefined && Date.parse(last.resetsAt) <= nowMs
+
+    return hasReset ? { kind, percentUsed: 0 } : last
+  })
+}
 
 /** The part of a breakdown the report reads. */
 export type Breakdown = Pick<SessionContextBreakdown, 'categories' | 'mcpTools'>

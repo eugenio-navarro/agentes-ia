@@ -29,6 +29,7 @@ import {
   topicInstructions,
   topicQuestion,
   windowLabelOf,
+  windowsShown,
 } from './advisor'
 import type { AdviceKind, Gauge, Level, Ledger, Signals } from '../types'
 
@@ -119,7 +120,11 @@ const startOver = async ($: EngineInterface) => {
   stopPauseTimers()
   await update($, signals, () => QUIET)
   // What the detection spent is the session's, not the conversation's: it outlives a compaction.
-  await update($, ledger, now => ({ ...EMPTY, classifier: now.classifier }))
+  await update($, ledger, now => ({
+    ...EMPTY,
+    classifier: ledgerFrom(now).classifier,
+    windows: ledgerFrom(now).windows,
+  }))
   await update($, figures, () => null)
   setStatus($, undefined)
 }
@@ -129,7 +134,15 @@ const startOver = async ($: EngineInterface) => {
  * wherever the figures may have moved; state is written only when they did.
  */
 const refresh = async ($: EngineInterface) => {
-  const usage = await $.session.usage()
+  const reported = await $.session.usage()
+  const kept = ledgerFrom(await read($, ledger)).windows
+  const windows = windowsShown(reported.rateLimits, kept, await $.clock.now())
+
+  if (JSON.stringify(windows) !== JSON.stringify(kept)) {
+    await update($, ledger, now => ({ ...ledgerFrom(now), windows }))
+  }
+
+  const usage = { ...reported, rateLimits: windows }
   const percent = usage.context.percent ?? null
   const shown = figuresOf(usage)
 
@@ -304,11 +317,12 @@ export const register: Register = on => {
   })
 
   on('command.run', { command: 'uso' }, async $ => {
-    const usage = await $.session.usage({ breakdown: 'summary' })
+    const reported = await $.session.usage({ breakdown: 'summary' })
+    const spent = ledgerFrom(await read($, ledger))
+    const now = await $.clock.now()
+    const usage = { ...reported, rateLimits: windowsShown(reported.rateLimits, spent.windows, now) }
 
-    return {
-      text: reportOf(usage, usage.context.breakdown, ledgerFrom(await read($, ledger)), await $.clock.now()),
-    }
+    return { text: reportOf(usage, reported.context.breakdown, spent, now) }
   })
 
   on('prompt.submit', async ($, e, next) => {
@@ -431,12 +445,12 @@ export const register: Register = on => {
     // One row: the gauges, then, only when there is something to recommend, the command
     // itself as the one button to press, and Ignorar beside it.
     return (
-      <Box columnGap={3} alignItems="center" flexWrap="wrap">
+      <Box columnGap={2} alignItems="center" flexWrap="wrap">
         {gauge(shown.context)}
         {shown.limits.map(limit => gauge(limit))}
         {shown.cost !== null && (
           <Box flexShrink={0}>
-            <Text color={MUTED}>{shown.cost}</Text>
+            <Text color={MUTED}>{`Precio: ${shown.cost}`}</Text>
           </Box>
         )}
         {kind !== null && command !== null && (

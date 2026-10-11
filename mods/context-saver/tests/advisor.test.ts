@@ -20,6 +20,7 @@ import {
   topicAnswer,
   topicInstructions,
   topicQuestion,
+  windowsShown,
 } from '../hooks/advisor'
 import type { Signals } from '../types'
 
@@ -132,13 +133,42 @@ describe('state kept from an earlier version', () => {
     const big = { tool: 'Read', target: 'big.ts', tokens: 12_000 }
     const ledger = ledgerFrom({ bigOutputs: [big], fullReads: {} })
 
-    expect(ledger).toEqual({ bigOutputs: [big], fullReads: {}, prompts: [], classifier: { asked: 0, tokens: 0 } })
+    expect(ledger).toEqual({
+      bigOutputs: [big],
+      fullReads: {},
+      prompts: [],
+      classifier: { asked: 0, tokens: 0 },
+      windows: [],
+    })
     expect(reportOf({ startedAt: 0, context: { window: 200_000 }, rateLimits: [] }, undefined, ledger, 0)).toContain('Salidas grandes')
   })
 
   test('starts from the defaults when nothing is stored', () => {
     expect(signalsFrom(undefined)).toEqual({ percent: null, cut: null, pause: 'none', hidden: null, topic: null })
     expect(ledgerFrom(null).classifier).toEqual({ asked: 0, tokens: 0 })
+  })
+})
+
+describe('windowsShown', () => {
+  const AT = Date.parse('2026-10-11T14:00:00Z')
+  const fiveHours = { kind: 'five_hour', percentUsed: 42, resetsAt: '2026-10-11T14:02:00Z' }
+  const week = { kind: 'seven_day', percentUsed: 4 }
+
+  test('shows what the engine reports, in the order first seen', () => {
+    expect(windowsShown([fiveHours, week], [], AT)).toEqual([fiveHours, week])
+    expect(windowsShown([{ ...week, percentUsed: 5 }, fiveHours], [fiveHours, week], AT)).toEqual([
+      fiveHours,
+      { ...week, percentUsed: 5 },
+    ])
+  })
+
+  test('keeps a window the engine left out: as it was until its reset, at 0% after it', () => {
+    expect(windowsShown([week], [fiveHours, week], AT), 'before its reset').toEqual([fiveHours, week])
+    expect(windowsShown([week], [fiveHours, week], AT + 3 * 60_000), 'after its reset').toEqual([
+      { kind: 'five_hour', percentUsed: 0 },
+      week,
+    ])
+    expect(windowsShown([], [week], AT + 3 * 60_000), 'no reset time known').toEqual([week])
   })
 })
 
@@ -332,7 +362,7 @@ describe('reportOf', () => {
       { name: 'mcp__drive__a', serverName: 'drive', tokens: 9_000, isLoaded: false },
     ],
   }
-  const QUIET = { bigOutputs: [], fullReads: {}, prompts: [], classifier: { asked: 0, tokens: 0 } }
+  const QUIET = { bigOutputs: [], fullReads: {}, prompts: [], classifier: { asked: 0, tokens: 0 }, windows: [] }
 
   test('opens with one bar per figure: context, each usage window, then the cost', () => {
     const lines = reportOf(usage, breakdown, QUIET, NOW).split('\n')

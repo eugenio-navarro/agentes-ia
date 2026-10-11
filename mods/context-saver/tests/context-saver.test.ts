@@ -142,10 +142,10 @@ test('draws context and cost in the band above the prompt after a turn', async (
     } else {
       const bar = await ui.find({ type: 'Svg' })
       expect(String(bar?.props.source), 'a rounded bar').toContain('rx="4" fill="#4ade80"')
-      expect(bar?.props).toMatchObject({ alt: '42%', width: 80, height: 8 })
+      expect(bar?.props).toMatchObject({ alt: '42%', width: 56, height: 8 })
     }
     const shown = (await ui.findAll({ type: 'Text' })).map(one => one.text)
-    expect(shown, 'the price alone, no label').toContain('$1.50')
+    expect(shown, 'the price with its label, in one piece').toContain('Precio: $1.50')
     expect(await ui.find({ key: 'compact' }), 'no advice at 42%').toBe(undefined)
     await ui.unmount()
 
@@ -478,6 +478,24 @@ test('says when a file was read whole three times, and ignores partial reads', a
 
   await read($, 'C:/p/a.ts')
   expect(world.toasts.at(-1)).toMatch(/a\.ts.*3 veces/)
+})
+
+test('keeps a usage window on screen at 0% after the engine stops reporting it', async ($, on) => {
+  const world = worldOf(on, 20)
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  const texts = async () => (await ui.findAll({ type: 'Text' })).map(one => one.text)
+
+  world.usage = {
+    ...usageAt(20),
+    rateLimits: [{ kind: 'five_hour', percentUsed: 42, resetsAt: new Date(2 * 60_000).toISOString() }],
+  }
+  await endTurn($)
+  expect(await texts()).toEqual(expect.arrayContaining(['5h', '42%']))
+
+  world.usage = usageAt(20)
+  await world.clock.advance(3 * 60_000)
+  await endTurn($)
+  expect(await texts(), 'still there, reset to zero').toEqual(expect.arrayContaining(['5h', '0%']))
 })
 
 test('announces a rate-limit window near its cap once', async ($, on) => {

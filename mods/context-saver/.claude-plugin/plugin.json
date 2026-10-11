@@ -1,6 +1,6 @@
 {
   "name": "context-saver",
-  "version": "0.9.1",
+  "version": "0.9.3",
   "description": "Suggests when to /compact or /clear and shows where the context window goes, without spending tokens.",
   "author": {
     "name": "Eugenio Navarro"
