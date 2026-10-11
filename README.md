@@ -55,14 +55,10 @@ pedile a tu IA: *"Instalá los agentes siguiendo extra/INSTALAR.md"*.
 
 ## Mods
 
-Claude Code lee los mods directo de `mods/`, así que un cambio ahí se carga al recargar los plugins.
-Para instalarlos en una máquina nueva, desde la raíz del repo:
-
-```bash
-claude plugin marketplace add ./mods
-claude plugin install context-saver@claude-mods
-```
+`mods/` es la fuente; el instalador (`python extra/instalar_claude_code.py`) los copia a `~/.claude/mods`
+y los registra en Claude Code con `claude plugin`. Claude lee esa copia, así que el repo se puede mover
+o tener cambios a medio hacer sin afectar tus sesiones.
 
 Para probar un mod: `claude plugin validate mods/context-saver` y `claude plugin test mods/context-saver`.
-Después de editarlo, subí la versión en su `plugin.json`, corré
-`claude plugin update context-saver@claude-mods` y recargá los plugins (`/reload-plugins`) o reiniciá la app.
+Después de editarlo, subí la versión en su `plugin.json`, corré el instalador y recargá los plugins
+(`/reload-plugins`) o reiniciá la app.

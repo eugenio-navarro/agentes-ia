@@ -49,7 +49,8 @@ python -m unittest discover extra              # tests del instalador
 
 Aplica las reglas de abajo, regenera los agentes desde `agents/` (el repo es la fuente de verdad),
 copia `hooks/` y `FILOSOFIA.md`, agrega la línea de la filosofía a `~/.claude/CLAUDE.md` sin borrar lo
-que tenga, y guarda en `~/.claude/backups-agentes/<fecha>/` los archivos que reemplaza. No toca
+que tenga, y guarda en `~/.claude/backups-agentes/<fecha>/` los archivos que reemplaza. También copia
+`mods/` a `~/.claude/mods` y registra cada mod con `claude plugin`; ese registro es lo único que cambia
 `settings.json`. Se corre a mano después de cada cambio: no se ejecuta solo. Los cambios aplican desde
 la próxima sesión.
 
