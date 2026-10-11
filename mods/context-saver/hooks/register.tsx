@@ -230,6 +230,18 @@ const noteWholeRead = async ($: EngineInterface, e: ToolCallInput) => {
   }
 }
 
+/** Notes a subagent's turn: its tokens never show in this conversation's context, only in /uso. */
+const noteAgent = async ($: EngineInterface, id: string, usage: Parameters<typeof agentNoted>[2]) => {
+  const isNoted = ledgerFrom(await read($, ledger)).agents.some(one => one.id === id)
+  // What it is and what for, asked once while the engine still lists it; the call is free.
+  const known = isNoted ? undefined : (await $.agent.list().catch(() => [])).find(one => one.id === id)
+
+  await update($, ledger, now => ({
+    ...ledgerFrom(now),
+    agents: agentNoted(ledgerFrom(now).agents, id, usage, known),
+  }))
+}
+
 /**
  * Runs the command the person pressed, as if they had typed it; pressing is their decision.
  * What follows a compaction or a clear is noted by the hooks on those events.
@@ -358,11 +370,7 @@ export const register: Register = on => {
     const { agentId, usage } = e
 
     if (agentId !== undefined) {
-      // A subagent's turn: its tokens never show in this conversation's context, only here.
-      await update($, ledger, now => ({
-        ...ledgerFrom(now),
-        agents: agentNoted(ledgerFrom(now).agents, agentId, usage),
-      }))
+      await noteAgent($, agentId, usage)
 
       return done
     }
@@ -552,6 +560,18 @@ export const register: Register = on => {
                     <Text color={MUTED}>{block.label}</Text>
                   </Box>
                   <Text>{block.value}</Text>
+                </Box>
+              )
+            case 'agent':
+              return (
+                <Box columnGap={1}>
+                  <Box width={LIMITS.reportLabelCells} flexShrink={0}>
+                    <Text color={MUTED}>{block.type}</Text>
+                  </Box>
+                  <Box width={12} flexShrink={0}>
+                    <Text bold>{block.amount}</Text>
+                  </Box>
+                  <Text>{block.description}</Text>
                 </Box>
               )
             case 'title':

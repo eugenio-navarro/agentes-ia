@@ -28,6 +28,7 @@ type World = {
   statuses: (string | undefined)[]
   toasts: string[]
   commands: string[]
+  agents: { id: string; type: string; description: string }[]
   compactions: (string | undefined)[]
   topicAnswer: string | null
   asked: string[]
@@ -54,6 +55,7 @@ const worldOf = (on: On, percent: number | undefined): World => {
     statuses: [],
     toasts: [],
     commands: [],
+    agents: [],
     compactions: [],
     topicAnswer: 'MISMO',
     asked: [],
@@ -71,6 +73,7 @@ const worldOf = (on: On, percent: number | undefined): World => {
     return { value: undefined }
   })
   on('command.register', ($, e) => ({ value: { command: e.name } }))
+  on('agent.list', () => ({ value: world.agents.map(one => ({ ...one, status: 'running' })) as never }))
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('session.end', ($, e) => ({ sessionId: e.sessionId }) as never)
   on('prompt.submit', ($, e) => ({ text: e.text }))
@@ -515,8 +518,12 @@ test('/uso says what the detection itself spent', async ($, on) => {
   expect(ran.text).toContain('Detección de cambio de tema: 1 consulta del mod a Haiku · 302 tokens')
 })
 
-test('/uso counts the agents launched and what they processed, and keeps the count after a compaction', async ($, on) => {
-  worldOf(on, 50)
+test('/uso lists each agent with what it processed, and keeps the list after a compaction', async ($, on) => {
+  const world = worldOf(on, 50)
+  world.agents = [
+    { id: 'a1', type: 'software-engineer', description: 'ING: implementar login' },
+    { id: 'a2', type: 'Explore', description: 'buscar usos' },
+  ]
   const usage = {
     input_tokens: 1000,
     output_tokens: 200,
@@ -546,16 +553,20 @@ test('/uso counts the agents launched and what they processed, and keeps the cou
 
   await $.session.start({ cwd: 'C:/p', surface: 'terminal', isInteractive: true })
   await endTurn($)
-  expect(await report(), 'the main loop is no agent').not.toContain('Agentes')
+  expect(await report(), 'the main loop is no agent').toContain('Agentes\nNo se usaron agentes en esta sesión.')
 
   await agentTurn('a1', usage)
   await agentTurn('a1', usage)
   await agentTurn('a2')
-  expect(await report()).toContain('Agentes lanzados: 2 · 10k tokens procesados')
+  // The engine drops an agent from its list once it ends: what was noted stays.
+  world.agents = []
+  const listed =
+    'Agentes\n• software-engineer | ING: implementar login | 10k tokens\n• Explore | buscar usos | 0 tokens'
+  expect(await report()).toContain(listed)
 
   await $.session.compact({ trigger: 'manual', messages: SUMMARY })
   await endTurn($)
-  expect(await report(), 'the session spent it, not the conversation').toContain('Agentes lanzados: 2')
+  expect(await report(), 'the session spent it, not the conversation').toContain(listed)
 })
 
 test("draws the /uso report in the transcript with the band's bars, a title per part and one row per figure", async ($, on) => {
@@ -571,6 +582,9 @@ test("draws the /uso report in the transcript with the band's bars, a title per 
     '',
     'Detalle del gasto',
     '• Conectores más pesados: browser 11k',
+    '',
+    'Agentes',
+    '• Explore | buscar usos | 80k tokens',
   ].join('\n')
 
   for (const surface of SURFACES) {
@@ -582,7 +596,7 @@ test("draws the /uso report in the transcript with the band's bars, a title per 
     })
     const bold = (await ui.findAll({ type: 'Text' })).filter(one => one.props.bold === true).map(one => one.text)
     expect(bold).toEqual(
-      expect.arrayContaining(['Uso', 'Qué ocupa el contexto', 'Detalle del gasto', '48%', '85%', '$16.45']),
+      expect.arrayContaining(['Uso', 'Qué ocupa el contexto', 'Detalle del gasto', 'Agentes', '48%', '85%', '$16.45', '80k tokens']),
     )
 
     const texts = await ui.findAll({ type: 'Text' })
@@ -592,6 +606,8 @@ test("draws the /uso report in the transcript with the band's bars, a title per 
     )
     expect(labelOf('Conectores más pesados')).toMatchObject({ color: '#9ca3af' })
     expect(texts.map(one => one.text)).toContain('browser 11k')
+    expect(labelOf('Explore'), 'an agent reads as the rows above it').toMatchObject({ color: '#9ca3af' })
+    expect(texts.map(one => one.text)).toContain('buscar usos')
     expect(texts.map(one => one.text), 'the first label, without the name').toContain('Contexto')
     expect(texts.some(one => String(one.text).includes('context-saver'))).toBe(false)
 

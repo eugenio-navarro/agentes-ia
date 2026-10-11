@@ -142,7 +142,7 @@ describe('state kept from an earlier version', () => {
       fullReads: {},
       prompts: [],
       classifier: { asked: 0, tokens: 0 },
-      agents: { ids: [], tokens: 0 },
+      agents: [],
       windows: [],
     })
     expect(reportOf({ startedAt: 0, context: { window: 200_000 }, rateLimits: [] }, undefined, ledger, 0)).toContain('Salidas grandes')
@@ -151,7 +151,8 @@ describe('state kept from an earlier version', () => {
   test('starts from the defaults when nothing is stored', () => {
     expect(signalsFrom(undefined)).toEqual({ percent: null, cut: null, pause: 'none', hidden: null, topic: null })
     expect(ledgerFrom(null).classifier).toEqual({ asked: 0, tokens: 0 })
-    expect(ledgerFrom({ bigOutputs: [] }).agents, 'state saved before agents were counted').toEqual({ ids: [], tokens: 0 })
+    expect(ledgerFrom({ bigOutputs: [] }).agents, 'state saved before agents were noted').toEqual([])
+    expect(ledgerFrom({ agents: { ids: ['a1'], tokens: 5 } } as never).agents, 'a count, as 0.12.0 kept it').toEqual([])
   })
 })
 
@@ -180,17 +181,20 @@ describe('windowsShown', () => {
 
 describe('agentNoted', () => {
   const usage = { input_tokens: 1000, output_tokens: 200, cache_read_input_tokens: 3000, cache_creation_input_tokens: 800 }
+  const known = { type: 'Explore', description: '  buscar usos\nde X | Y  ' }
 
-  test('counts an agent once however many turns it runs, and adds up every token its turns processed', () => {
-    const once = agentNoted({ ids: [], tokens: 0 }, 'a1', usage)
-    const twice = agentNoted(once, 'a1', usage)
+  test('notes an agent once however many turns it runs, and adds up every token its turns processed', () => {
+    const once = agentNoted([], 'a1', usage, known)
+    const twice = agentNoted(once, 'a1', usage, undefined)
 
-    expect(once).toEqual({ ids: ['a1'], tokens: 5000 })
-    expect(twice).toEqual({ ids: ['a1'], tokens: 10_000 })
+    expect(once).toEqual([{ id: 'a1', type: 'Explore', description: 'buscar usos de X / Y', tokens: 5000 }])
+    expect(twice).toEqual([{ id: 'a1', type: 'Explore', description: 'buscar usos de X / Y', tokens: 10_000 }])
   })
 
-  test('counts an agent whose turn reported no usage, with no tokens', () => {
-    expect(agentNoted({ ids: ['a1'], tokens: 5000 }, 'a2', undefined)).toEqual({ ids: ['a1', 'a2'], tokens: 5000 })
+  test('notes an agent the engine says nothing about, and a turn with no usage', () => {
+    expect(agentNoted([], 'a2', undefined, undefined)).toEqual([
+      { id: 'a2', type: 'agente', description: '', tokens: 0 },
+    ])
   })
 })
 
@@ -225,6 +229,21 @@ describe('reportBlocks', () => {
       { kind: 'title', text: 'Detalle del gasto' },
       { kind: 'detail', label: 'Conectores más pesados', value: 'browser 11k · gmail 1k' },
     ])
+  })
+
+  test('reads the agents part: a line an agent, the rest summed up, or a note when there were none', () => {
+    const text = ['Agentes', '• Explore | buscar: usos | 80k tokens', '• agente |  | 0 tokens', 'y 2 más: 3k tokens']
+
+    expect(reportBlocks(text.join('\n'))).toEqual([
+      { kind: 'title', text: 'Agentes' },
+      { kind: 'agent', type: 'Explore', description: 'buscar: usos', amount: '80k tokens' },
+      { kind: 'agent', type: 'agente', description: '', amount: '0 tokens' },
+      { kind: 'fact', label: 'y 2 más', value: '3k tokens' },
+    ])
+    expect(reportBlocks('Agentes\nNo se usaron agentes en esta sesión.')[1]).toEqual({
+      kind: 'note',
+      text: 'No se usaron agentes en esta sesión.',
+    })
   })
 
   test('reads a report with no reading as a note, and colours a figure by the usual levels', () => {
@@ -450,7 +469,7 @@ describe('reportOf', () => {
     fullReads: {},
     prompts: [],
     classifier: { asked: 0, tokens: 0 },
-    agents: { ids: [], tokens: 0 },
+    agents: [],
     windows: [],
   }
 
@@ -482,7 +501,7 @@ describe('reportOf', () => {
 
   test('names the heaviest loaded connectors, and what the conversation spent only when it did', () => {
     const quiet = reportOf(usage, breakdown, QUIET, NOW)
-    expect(quiet.endsWith('\n\nDetalle del gasto\n• Conectores más pesados: browser 11k · gmail 1k'), 'a part of its own, with its title').toBe(true)
+    expect(quiet.includes('\n\nDetalle del gasto\n• Conectores más pesados: browser 11k · gmail 1k\n\nAgentes\n'), 'a part of its own, with its title').toBe(true)
     expect(quiet).not.toContain('drive')
     expect(quiet).not.toContain('Salidas grandes')
     expect(quiet).not.toContain('Releídos')
@@ -503,11 +522,35 @@ describe('reportOf', () => {
     expect(busy).not.toContain('b.ts')
   })
 
-  test('says how many agents were launched and what they processed, only when there were any', () => {
-    expect(reportOf(usage, breakdown, QUIET, NOW)).not.toContain('Agentes')
+  test('lists each agent on a line of its own under a title, heaviest first, and says so when there were none', () => {
+    const quiet = reportOf(usage, breakdown, QUIET, NOW)
+    expect(quiet.endsWith('\n\nAgentes\nNo se usaron agentes en esta sesión.')).toBe(true)
 
-    const busy = reportOf(usage, breakdown, { ...QUIET, agents: { ids: ['a1', 'a2'], tokens: 412_300 } }, NOW)
-    expect(busy).toContain('\n• Agentes lanzados: 2 · 412k tokens procesados')
+    const agents = [
+      { id: 'a1', type: 'Explore', description: 'buscar usos', tokens: 80_000 },
+      { id: 'a2', type: 'software-engineer', description: 'ING: implementar login', tokens: 412_300 },
+    ]
+    const busy = reportOf(usage, breakdown, { ...QUIET, agents }, NOW)
+
+    expect(
+      busy.endsWith(
+        '\n\nAgentes\n• software-engineer | ING: implementar login | 412k tokens\n• Explore | buscar usos | 80k tokens',
+      ),
+    ).toBe(true)
+    expect(busy).not.toContain('No se usaron')
+  })
+
+  test('lists the six heaviest agents and sums up the rest in one line', () => {
+    const agents = Array.from({ length: 8 }, (_, index) => ({
+      id: `a${index}`,
+      type: 'Explore',
+      description: `tarea ${index}`,
+      tokens: (index + 1) * 1000,
+    }))
+    const lines = reportOf(usage, breakdown, { ...QUIET, agents }, NOW).split('\n')
+
+    expect(lines.filter(line => line.startsWith('• Explore |')).length).toBe(6)
+    expect(lines.at(-1)).toBe('y 2 más: 3k tokens')
   })
 
   test('says so in one line when the engine has no reading yet', () => {
@@ -519,6 +562,6 @@ describe('reportOf', () => {
   test('writes only lines the transcript knows how to draw', () => {
     const kinds = reportBlocks(reportOf(usage, breakdown, QUIET, NOW)).map(block => block.kind)
 
-    expect(kinds).toEqual(['figure', 'figure', 'figure', 'fact', 'title', 'share', 'share', 'share', 'share', 'title', 'detail'])
+    expect(kinds).toEqual(['figure', 'figure', 'figure', 'fact', 'title', 'share', 'share', 'share', 'share', 'title', 'detail', 'title', 'note'])
   })
 })

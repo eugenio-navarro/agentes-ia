@@ -47,6 +47,10 @@ export const LIMITS = {
   reportBarCells: 20,
   /** The column the labels under a title of the report take, so its rows start together. */
   reportLabelCells: 28,
+  /** The agents the report lists one by one, heaviest first; the rest are summed up. */
+  agentsListed: 6,
+  /** The most of an agent's task the report repeats. */
+  agentClipChars: 60,
 } as const
 
 export const COMPACT_INSTRUCTIONS =
@@ -64,7 +68,7 @@ export const EMPTY_LEDGER: Ledger = {
   fullReads: {},
   prompts: [],
   classifier: { asked: 0, tokens: 0 },
-  agents: { ids: [], tokens: 0 },
+  agents: [],
   windows: [],
 }
 
@@ -80,6 +84,8 @@ export const signalsFrom = (stored: Partial<Signals> | null | undefined): Signal
 export const ledgerFrom = (stored: Partial<Ledger> | null | undefined): Ledger => ({
   ...EMPTY_LEDGER,
   ...stored,
+  // 0.12.0 kept a count of the agents, not a list: that is started over.
+  agents: Array.isArray(stored?.agents) ? stored.agents : [],
 })
 
 /**
@@ -371,6 +377,8 @@ export const shortCount = (count: number): string => {
 const REPORT_BAR_CELLS = LIMITS.reportBarCells
 const CONTEXT_TITLE = 'Qué ocupa el contexto'
 const DETAIL_TITLE = 'Detalle del gasto'
+const AGENTS_TITLE = 'Agentes'
+const NO_AGENTS = 'No se usaron agentes en esta sesión.'
 const REPORT_LABEL_WIDTH = 10
 const WINDOW_NAMES: Readonly<Record<string, string>> = { five_hour: '5 horas', seven_day: '7 días' }
 
@@ -429,9 +437,9 @@ export const levelFor = (percent: number): Level =>
   percent >= LIMITS.urgentAt ? 'danger' : percent >= LIMITS.compactAt ? 'warn' : 'ok'
 
 /**
- * The agents count after one of an agent's turns: an agent counts once however many turns
- * it runs, and its tokens are all the turn processed, cached or not; a turn that reports
- * no usage adds none.
+ * The agents noted after one of an agent's turns. An agent is listed once however many
+ * turns it runs; its tokens are all its turns processed, cached or not, and a turn that
+ * reports no usage adds none. `known` is what the engine says of it, asked the first time.
  */
 export const agentNoted = (
   agents: Ledger['agents'],
@@ -444,17 +452,29 @@ export const agentNoted = (
         cache_creation_input_tokens: number
       }
     | undefined,
-): Ledger['agents'] => ({
-  ids: agents.ids.includes(id) ? agents.ids : [...agents.ids, id],
-  tokens:
-    agents.tokens +
-    (usage === undefined
+  known: { type: string; description: string } | undefined,
+): Ledger['agents'] => {
+  const spent =
+    usage === undefined
       ? 0
       : usage.input_tokens +
         usage.output_tokens +
         usage.cache_read_input_tokens +
-        usage.cache_creation_input_tokens),
-})
+        usage.cache_creation_input_tokens
+
+  if (agents.some(one => one.id === id)) {
+    return agents.map(one => (one.id === id ? { ...one, tokens: one.tokens + spent } : one))
+  }
+
+  // One line, with nothing the report's own separator could be taken for.
+  const description = (known?.description ?? '')
+    .replace(/\|/g, '/')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .slice(0, LIMITS.agentClipChars)
+
+  return [...agents, { id, type: known?.type ?? 'agente', description, tokens: spent }]
+}
 
 /** A command's text without the plugin's name the engine puts before it where it shows it. */
 export const withoutName = (text: string, plugin: string): string =>
@@ -466,11 +486,13 @@ export type ReportBlock =
   | { kind: 'share'; label: string; percent: number; amount: string }
   | { kind: 'fact'; label: string; value: string }
   | { kind: 'detail'; label: string; value: string }
+  | { kind: 'agent'; type: string; description: string; amount: string }
   | { kind: 'title'; text: string }
   | { kind: 'note'; text: string }
 
 const FIGURE_LINE = /^(.+?)\s+[█░]+\s+(\d+)%(?: · (.*))?$/
 const SHARE_LINE = /^• (.+): (\S+) \((\d+)%\)$/
+const AGENT_LINE = /^• (.+?) \| (.*) \| (.+)$/
 const DETAIL_LINE = /^• ([^:]+): (.+)$/
 const FACT_LINE = /^([^:]+): (.+)$/
 
@@ -495,6 +517,12 @@ export const reportBlocks = (text: string): ReportBlock[] =>
         }
       }
 
+      const agent = AGENT_LINE.exec(line)
+
+      if (agent !== null) {
+        return { kind: 'agent', type: agent[1] ?? '', description: agent[2] ?? '', amount: agent[3] ?? '' }
+      }
+
       const share = SHARE_LINE.exec(line)
 
       if (share !== null) {
@@ -513,7 +541,7 @@ export const reportBlocks = (text: string): ReportBlock[] =>
         return { kind: 'fact', label: fact[1] ?? '', value: fact[2] ?? '' }
       }
 
-      return line === CONTEXT_TITLE || line === DETAIL_TITLE
+      return line === CONTEXT_TITLE || line === DETAIL_TITLE || line === AGENTS_TITLE
         ? { kind: 'title', text: line }
         : { kind: 'note', text: line }
     })
@@ -521,7 +549,8 @@ export const reportBlocks = (text: string): ReportBlock[] =>
 /**
  * The /uso report: a bar for the context and each usage window, the cost, what fills the
  * context, and what the conversation spent it on. Only lines the person can act on, and
- * every part after the first under a title of its own.
+ * every part after the first under a title of its own; the agents close it, one a line,
+ * or a line saying there were none.
  */
 export const reportOf = (
   usage: SessionUsage,
@@ -567,11 +596,6 @@ export const reportOf = (
       'Releídos enteros',
       repeated.map(([path, times]) => `${baseName(path)} ×${times}`),
     ),
-    ...(ledger.agents.ids.length === 0
-      ? []
-      : [
-          `• Agentes lanzados: ${ledger.agents.ids.length} · ${shortCount(ledger.agents.tokens)} tokens procesados`,
-        ]),
     ...(ledger.classifier.asked === 0
       ? []
       : [
@@ -579,10 +603,29 @@ export const reportOf = (
         ]),
   ]
 
+  const hasReading = context.percent !== undefined && context.tokens !== undefined
+  const heaviest = [...ledger.agents].sort((a, b) => b.tokens - a.tokens)
+  const rest = heaviest.slice(LIMITS.agentsListed)
+  const agents =
+    heaviest.length === 0
+      ? hasReading
+        ? [AGENTS_TITLE, NO_AGENTS]
+        : []
+      : [
+          AGENTS_TITLE,
+          ...heaviest
+            .slice(0, LIMITS.agentsListed)
+            .map(one => `• ${one.type} | ${one.description} | ${shortCount(one.tokens)} tokens`),
+          ...(rest.length === 0
+            ? []
+            : [`y ${rest.length} más: ${shortCount(rest.reduce((total, one) => total + one.tokens, 0))} tokens`]),
+        ]
+
   return [
     figures,
     groups.length === 0 ? [] : [CONTEXT_TITLE, ...groups],
     spent.length === 0 ? [] : [DETAIL_TITLE, ...spent],
+    agents,
   ]
     .filter(lines => lines.length > 0)
     .map(lines => lines.join('\n'))
