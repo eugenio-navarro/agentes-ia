@@ -5,12 +5,11 @@ import {
   afterFill,
   barCellsFor,
   barSvg,
+  commandFor,
   cutOf,
   estimateTokens,
   figuresOf,
   filledCells,
-  messageOf,
-  offersClear,
   reportOf,
   resetIn,
   shortCount,
@@ -21,60 +20,55 @@ import type { Signals } from '../types'
 const signals = (over: Partial<Signals>): Signals => ({
   percent: null,
   cut: null,
-  isIdle: false,
+  pause: 'none',
   hidden: null,
   ...over,
 })
 
 describe('adviceFor', () => {
   test('stays quiet before the first response and under 40%', () => {
-    expect(adviceFor(signals({ cut: 'commit' }))).toBe(null)
-    expect(adviceFor(signals({ percent: 39, cut: 'commit', isIdle: true }))).toBe(null)
+    expect(adviceFor(signals({ cut: 'commit', pause: 'long' }))).toBe(null)
+    expect(adviceFor(signals({ percent: 39, cut: 'commit', pause: 'long' }))).toBe(null)
   })
 
-  test('offers both ways out after a commit from 40%', () => {
-    expect(adviceFor(signals({ percent: 40, cut: 'commit' }))).toBe('commit')
+  test('takes the work as done once a commit is followed by a break, from 40%', () => {
+    expect(adviceFor(signals({ percent: 40, cut: 'commit' })), 'no break yet').toBe(null)
+    expect(adviceFor(signals({ percent: 40, cut: 'commit', pause: 'short' }))).toBe('done')
+    expect(adviceFor(signals({ percent: 95, cut: 'commit', pause: 'long' })), 'even when full').toBe('done')
   })
 
-  test('suggests compacting on green tests only from 60%', () => {
+  test('takes a natural cut from 60%: a commit or green tests', () => {
     expect(adviceFor(signals({ percent: 59, cut: 'tests' }))).toBe(null)
-    expect(adviceFor(signals({ percent: 60, cut: 'tests' }))).toBe('tests')
+    expect(adviceFor(signals({ percent: 60, cut: 'tests' }))).toBe('cut')
+    expect(adviceFor(signals({ percent: 60, cut: 'commit' }))).toBe('cut')
+    expect(adviceFor(signals({ percent: 70, cut: 'tests', pause: 'short' })), 'green tests are not saved work').toBe('cut')
   })
 
-  test('says nothing between 40% and 80% without a natural cut', () => {
+  test('says nothing between 40% and 80% without a cut or a long pause', () => {
     expect(adviceFor(signals({ percent: 79 }))).toBe(null)
+    expect(adviceFor(signals({ percent: 79, pause: 'short' }))).toBe(null)
   })
 
-  test('insists from 80% whatever else is true', () => {
+  test('warns after a long pause from 40%, and insists from 80%', () => {
+    expect(adviceFor(signals({ percent: 45, pause: 'long' }))).toBe('idle')
     expect(adviceFor(signals({ percent: 80 }))).toBe('urgent')
-    expect(adviceFor(signals({ percent: 95, cut: 'commit', isIdle: true }))).toBe('urgent')
+    expect(adviceFor(signals({ percent: 90, pause: 'long', cut: 'tests' }))).toBe('urgent')
   })
 
-  test('warns after a long pause from 40%, ahead of a cut', () => {
-    expect(adviceFor(signals({ percent: 45, isIdle: true, cut: 'commit' }))).toBe('idle')
-  })
-
-  test('keeps a hidden advice hidden until a more pressing one comes', () => {
-    expect(adviceFor(signals({ percent: 50, cut: 'commit', hidden: 'commit' }))).toBe(null)
-    expect(adviceFor(signals({ percent: 85, cut: 'commit', hidden: 'commit' }))).toBe('urgent')
+  test('keeps an ignored advice hidden until another one comes', () => {
+    expect(adviceFor(signals({ percent: 65, cut: 'tests', hidden: 'cut' }))).toBe(null)
+    expect(adviceFor(signals({ percent: 85, cut: 'tests', hidden: 'cut' }))).toBe('urgent')
   })
 })
 
-describe('the recommendation', () => {
-  const KINDS = ['urgent', 'idle', 'commit', 'tests'] as const
-
-  test('always names the command it recommends, first', () => {
-    for (const kind of KINDS) {
-      expect(messageOf(kind, 70), kind).toMatch(/^Recomendado: \/compact\. /)
-    }
-  })
-
-  test('offers /clear only where a change of subject is plausible, and says so', () => {
-    expect(KINDS.filter(offersClear)).toEqual(['idle', 'commit'])
-
-    for (const kind of KINDS) {
-      expect(messageOf(kind, 70).includes('/clear'), kind).toBe(offersClear(kind))
-    }
+describe('commandFor', () => {
+  test('recommends /clear only when the work is saved, /compact otherwise', () => {
+    expect((['urgent', 'idle', 'cut', 'done'] as const).map(commandFor)).toEqual([
+      'compact',
+      'compact',
+      'compact',
+      'clear',
+    ])
   })
 })
 

@@ -9,20 +9,19 @@ import {
   barCellsFor,
   barSvg,
   baseName,
+  commandFor,
   cutOf,
   estimateTokens,
   figuresOf,
   filledCells,
   formatCount,
-  messageOf,
-  offersClear,
   reportOf,
   statusTextOf,
   windowLabelOf,
 } from './advisor'
 import type { AdviceKind, Gauge, Level, Ledger, Signals } from '../types'
 
-const QUIET: Signals = { percent: null, cut: null, isIdle: false, hidden: null }
+const QUIET: Signals = { percent: null, cut: null, pause: 'none', hidden: null }
 const EMPTY: Ledger = { bigOutputs: [], fullReads: {} }
 
 const signals = atom({ plugin: 'context-saver', key: 'signals' } as const, QUIET)
@@ -59,8 +58,8 @@ const targetOf = (e: ToolCallInput): string => {
 const isWholeRead = (e: ToolCallInput): e is ToolCallInput & { tool: 'Read' } =>
   e.tool === 'Read' && e.offset === undefined && e.limit === undefined && e.pages === undefined
 
-/** The wait that marks a long pause; lost on a reload, as every timer is. */
-let idleTimer: Timer | undefined
+/** The waits that mark a break and then a long pause; lost on a reload, as every timer is. */
+let pauseTimers: Timer[] = []
 /** Re-reads the engine's figures while nothing else does; lost on a reload too. */
 let refreshTimer: Timer | undefined
 /** The rate-limit windows already announced, so each is said once. */
@@ -77,14 +76,36 @@ const setStatus = ($: EngineInterface, text: string | undefined) => {
   }
 }
 
-const stopIdleTimer = () => {
-  idleTimer?.cancel()
-  idleTimer = undefined
+const stopPauseTimers = () => {
+  pauseTimers.forEach(timer => timer.cancel())
+  pauseTimers = []
+}
+
+/** Starts counting the pause after a turn: a break first, then long enough for the cache to lapse. */
+const startPauseTimers = ($: EngineInterface) => {
+  stopPauseTimers()
+  pauseTimers = [
+    $.clock.after(LIMITS.settledMs, () => {
+      void update($, signals, (now): Signals => ({ ...now, pause: 'short' }))
+    }),
+    $.clock.after(LIMITS.idleMs, () => {
+      void update($, signals, (now): Signals => ({ ...now, pause: 'long' }))
+    }),
+  ]
+}
+
+const EDITS: readonly string[] = ['Edit', 'Write', 'NotebookEdit']
+
+/** A file changed after the cut: the work is in progress again, so the cut no longer holds. */
+const noteEdit = async ($: EngineInterface, e: ToolCallInput) => {
+  if (EDITS.includes(String(e.tool)) && (await read($, signals)).cut !== null) {
+    await update($, signals, now => ({ ...now, cut: null }))
+  }
 }
 
 /** The conversation was compacted or cleared: nothing seen so far still holds. */
 const startOver = async ($: EngineInterface) => {
-  stopIdleTimer()
+  stopPauseTimers()
   await update($, signals, () => QUIET)
   await update($, ledger, () => EMPTY)
   await update($, figures, () => null)
@@ -233,11 +254,11 @@ export const register: Register = on => {
   })
 
   on('prompt.submit', async ($, e, next) => {
-    stopIdleTimer()
+    stopPauseTimers()
     await update($, signals, now => ({
       ...now,
       cut: null,
-      isIdle: false,
+      pause: 'none',
       hidden: hiddenAfterNews(now.hidden),
     }))
     await refresh($)
@@ -254,6 +275,7 @@ export const register: Register = on => {
     }
 
     if (ran.isError !== true) {
+      await noteEdit($, e)
       await noteCut($, e)
       await noteWholeRead($, e)
     }
@@ -272,10 +294,7 @@ export const register: Register = on => {
     }
 
     await refresh($)
-    stopIdleTimer()
-    idleTimer = $.clock.after(LIMITS.idleMs, () => {
-      void update($, signals, now => ({ ...now, isIdle: true }))
-    })
+    startPauseTimers($)
 
     return done
   })
@@ -311,8 +330,8 @@ export const register: Register = on => {
     const { Box, Button, Text } = $.ui.resolve(e)
     // A terminal has no vector element: there the bar is drawn in block characters.
     const Svg = e.surface === 'terminal' ? null : $.ui.resolve(e).Svg
-    const { percent } = now
     const kind = e.props.isWorking ? null : adviceFor(now)
+    const command = kind === null ? null : commandFor(kind)
     const cells = barCellsFor(e.props.bodyColumns)
 
     // A muted label, a thick rounded bar coloured up to what is used, and the percentage
@@ -343,28 +362,28 @@ export const register: Register = on => {
       )
     }
 
+    // One row: the gauges, then, only when there is something to recommend, the command
+    // itself as the one button to press, and Ignorar beside it.
     return (
-      <Box flexDirection="column">
-        <Box columnGap={3} alignItems="center">
-          {gauge(shown.context)}
-          {shown.limits.map(limit => gauge(limit))}
-          {shown.cost !== null && <Text color={MUTED}>{shown.cost}</Text>}
-        </Box>
-        {kind !== null && percent !== null && (
-          <Box flexDirection="column">
-            <Text color={kind === 'urgent' ? LEVEL_COLORS.danger : MUTED}>{messageOf(kind, percent)}</Text>
-            <Box columnGap={1}>
-              <Button key="compact" label="/compact" hotkey="1" variant="primary" onPress={() => void compact($)} />
-              {offersClear(kind) && (
-                <Button key="clear" label="/clear" hotkey="2" onPress={() => void clear($)} />
-              )}
-              <Button
-                key="hide"
-                label="Ocultar"
-                hotkey="0"
-                onPress={() => void update($, signals, seen => ({ ...seen, hidden: kind }))}
-              />
-            </Box>
+      <Box columnGap={3} alignItems="center">
+        {gauge(shown.context)}
+        {shown.limits.map(limit => gauge(limit))}
+        {shown.cost !== null && <Text color={MUTED}>{shown.cost}</Text>}
+        {kind !== null && command !== null && (
+          <Box columnGap={1}>
+            <Button
+              key={command}
+              label={`/${command}`}
+              hotkey="1"
+              variant="primary"
+              onPress={() => void (command === 'clear' ? clear($) : compact($))}
+            />
+            <Button
+              key="ignore"
+              label="Ignorar"
+              hotkey="0"
+              onPress={() => void update($, signals, seen => ({ ...seen, hidden: kind }))}
+            />
           </Box>
         )}
       </Box>

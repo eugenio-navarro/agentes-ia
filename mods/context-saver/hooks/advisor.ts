@@ -1,6 +1,6 @@
 import type { SessionContextBreakdown, SessionUsage } from 'claude-code'
 
-import type { AdviceKind, Cut, Figures, Gauge, Ledger, Signals } from '../types'
+import type { AdviceKind, Cut, Figures, Gauge, Ledger, Pause, Signals } from '../types'
 
 /** Every threshold the mod decides by, written once. */
 export const LIMITS = {
@@ -10,6 +10,8 @@ export const LIMITS = {
   compactAt: 60,
   /** From here it insists, before auto-compaction picks the moment. */
   urgentAt: 80,
+  /** Without a turn for this long after a commit, the person is taken to have stepped away. */
+  settledMs: 10 * 60 * 1000,
   /** Without a turn for this long the prompt cache is taken as lapsed. */
   idleMs: 60 * 60 * 1000,
   /** A tool result of this many tokens or more is named. */
@@ -50,39 +52,47 @@ export const cutOf = (command: string): Cut | null => {
 }
 
 /** Which advice the signals call for now, or null to stay quiet. */
-export const adviceFor = ({ percent, cut, isIdle, hidden }: Signals): AdviceKind | null => {
+export const adviceFor = ({ percent, cut, pause, hidden }: Signals): AdviceKind | null => {
   if (percent === null || percent < LIMITS.quietBelow) {
     return null
   }
 
-  const kind = pressingOf(percent, cut, isIdle)
+  const kind = pressingOf(percent, cut, pause)
 
   return kind === hidden ? null : kind
 }
 
-const pressingOf = (percent: number, cut: Cut | null, isIdle: boolean): AdviceKind | null => {
+const pressingOf = (percent: number, cut: Cut | null, pause: Pause): AdviceKind | null => {
+  // Committed and then left alone: nothing in the conversation is unsaved work.
+  if (cut === 'commit' && pause !== 'none') {
+    return 'done'
+  }
+
   if (percent >= LIMITS.urgentAt) {
     return 'urgent'
   }
 
-  if (isIdle) {
+  if (pause === 'long') {
     return 'idle'
   }
 
-  if (cut === 'commit') {
-    return 'commit'
-  }
-
-  return cut === 'tests' && percent >= LIMITS.compactAt ? 'tests' : null
+  return cut !== null && percent >= LIMITS.compactAt ? 'cut' : null
 }
 
-/** What became of a command written to the prompt box. */
-export type FillOutcome = 'written' | 'no-box' | 'refused'
+/**
+ * The command an advice recommends. /clear only when the work is saved: anything else may
+ * still need what the conversation holds, which /compact keeps.
+ */
+export const commandFor = (kind: AdviceKind): 'compact' | 'clear' =>
+  kind === 'done' ? 'clear' : 'compact'
 
 /**
- * Reads a prompt fill's answer. Only `no_composer` says no box exists, so only
- * then may the mod run the command for the person; any other refusal is unknown.
+ * What became of a command written to the prompt box. Only `no_composer` says no box exists,
+ * so only then may the mod run the command for the person; any other refusal is unknown.
  */
+export type FillOutcome = 'written' | 'no-box' | 'refused'
+
+/** Reads a prompt fill's answer. */
 export const afterFill = (filled: {
   isFilled: boolean
   refusal?: 'no_composer' | 'dialog'
@@ -92,26 +102,6 @@ export const afterFill = (filled: {
   }
 
   return filled.refusal === 'no_composer' ? 'no-box' : 'refused'
-}
-
-/**
- * Whether an advice also offers /clear: only where the person may be changing subject,
- * after a commit or a long pause. The mod cannot tell, so it never recommends it.
- */
-export const offersClear = (kind: AdviceKind): boolean => kind === 'idle' || kind === 'commit'
-
-/** The line the band shows for an advice: the command it recommends, then why. */
-export const messageOf = (kind: AdviceKind, percent: number): string => {
-  switch (kind) {
-    case 'urgent':
-      return `Recomendado: /compact. El contexto está al ${percent}% y conviene compactar ahora, antes de la compactación automática.`
-    case 'idle':
-      return `Recomendado: /compact. Pausa larga con el contexto al ${percent}%: la caché probablemente venció y el próximo turno lo paga completo. Si cambiás de tema, usá /clear.`
-    case 'commit':
-      return `Recomendado: /compact. Commit hecho con el contexto al ${percent}%: es un buen corte. Si cambiás de tema, usá /clear.`
-    case 'tests':
-      return `Recomendado: /compact. Tests en verde con el contexto al ${percent}%: es un buen corte para compactar.`
-  }
 }
 
 /** A local estimate, about four characters to a token; never the API's count. */

@@ -190,133 +190,158 @@ test('follows the engine during a turn, when a prompt is sent and while idle', a
   await shows(61)
 })
 
-test('stays quiet under 40% even after a commit', async ($, on) => {
-  worldOf(on, 30)
+const TEN_MINUTES = 10 * 60 * 1000
+const NEXT_PROMPT = { text: 'next thing', wait: false, origin: { kind: 'composer' } } as const
+
+/** The buttons the band shows now, by key: the recommended command, then Ignorar. */
+const buttonsOf = async (ui: {
+  findAll(query: { type: string }): Promise<{ key: string | undefined }[]>
+}) => (await ui.findAll({ type: 'Button' })).map(button => button.key)
+
+test('stays quiet under 40%, whatever happened', async ($, on) => {
+  const { clock } = worldOf(on, 30)
 
   await run($, 'git commit -m x')
   await endTurn($)
+  await clock.advance(2 * HOUR)
 
   for (const surface of SURFACES) {
     const ui = await $.ui.mount({ ...BAND, surface })
-    expect(await ui.find({ key: 'compact' })).toBe(undefined)
+    expect(await buttonsOf(ui)).toEqual([])
     await ui.unmount()
   }
 })
 
-test('offers /compact and /clear after a commit from 40%', async ($, on) => {
-  worldOf(on, 50)
-
-  await run($, 'git commit -m x')
+test('shows the recommended command itself, with Ignorar and no sentence', async ($, on) => {
+  worldOf(on, 85)
   await endTurn($)
 
   for (const surface of SURFACES) {
     const ui = await $.ui.mount({ ...BAND, surface })
-    expect(await ui.find({ type: 'Text', text: /Commit hecho.*50%/ })).toBeDefined()
-    expect(await ui.find({ key: 'compact' })).toBeDefined()
-    expect(await ui.find({ key: 'clear' })).toBeDefined()
-    expect(await ui.find({ key: 'hide' })).toBeDefined()
+    expect(await buttonsOf(ui)).toEqual(['compact', 'ignore'])
+    expect((await ui.find({ key: 'compact' }))?.props).toMatchObject({ label: '/compact', variant: 'primary' })
+    expect((await ui.find({ key: 'ignore' }))?.props).toMatchObject({ label: 'Ignorar' })
+    expect(await ui.find({ type: 'Text', text: 'Recomendado' })).toBe(undefined)
     await ui.unmount()
   }
 })
 
-test('suggests compacting on green tests from 60%, not on failed ones', async ($, on) => {
+test('recommends /compact at a natural cut from 60%: green tests or a commit, never failed tests', async ($, on) => {
   const world = worldOf(on, 65)
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
 
   world.isError = true
   await run($, 'npm test')
   await endTurn($)
-  const failed = await $.ui.mount({ ...BAND, surface: 'terminal' })
-  expect(await failed.find({ key: 'compact' })).toBe(undefined)
-  await failed.unmount()
+  expect(await buttonsOf(ui), 'failed tests').toEqual([])
 
   world.isError = false
   await run($, 'npm test')
   await endTurn($)
-  const green = await $.ui.mount({ ...BAND, surface: 'terminal' })
-  expect(await green.find({ type: 'Text', text: /Tests en verde.*65%/ })).toBeDefined()
-  await green.unmount()
-})
+  expect(await buttonsOf(ui), 'green tests').toEqual(['compact', 'ignore'])
 
-test('insists from 80% with no natural cut', async ($, on) => {
-  worldOf(on, 85)
-
-  await endTurn($)
-
-  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
-  expect(await ui.find({ type: 'Text', text: /^Recomendado: \/compact\. .*85%.*compactar ahora/})).toBeDefined()
-  expect(await ui.find({ key: 'compact' })).toBeDefined()
-  expect(await ui.find({ key: 'clear' }), 'a clear case offers no /clear').toBe(undefined)
-  expect(await ui.find({ key: 'hide' })).toBeDefined()
-})
-
-test('hides the advice when asked, and the next prompt drops a cut', async ($, on) => {
-  worldOf(on, 50)
+  await $.prompt.submit(NEXT_PROMPT)
+  expect(await buttonsOf(ui), 'the moment passed').toEqual([])
 
   await run($, 'git commit -m x')
   await endTurn($)
-  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
-  await ui.press({ key: 'hide' })
-  expect(await ui.find({ key: 'compact' })).toBe(undefined)
-
-  await run($, 'git commit -m y')
-  await endTurn($)
-  expect(await ui.find({ key: 'compact' })).toBeDefined()
-
-  await $.prompt.submit({ text: 'next thing', wait: false, origin: { kind: 'composer' } })
-  expect(await ui.find({ key: 'compact' })).toBe(undefined)
+  expect(await buttonsOf(ui), 'a commit').toEqual(['compact', 'ignore'])
 })
 
-test('writes the command in the prompt box for the person to send', async ($, on) => {
-  const world = worldOf(on, 50)
+test('recommends /clear once the work is committed and the person has stepped away', async ($, on) => {
+  const { clock } = worldOf(on, 50)
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
 
   await run($, 'git commit -m x')
   await endTurn($)
-  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
-  await ui.press({ key: 'compact' })
-  await ui.press({ key: 'clear' })
+  expect(await buttonsOf(ui), 'right after the commit').toEqual([])
 
-  expect(world.fills[0]).toMatch(/^\/compact Conservá/)
-  expect(world.fills[1]).toBe('/clear')
-  expect(world.compactions).toEqual([])
+  await clock.advance(TEN_MINUTES)
+  expect(await buttonsOf(ui), 'after a break').toEqual(['clear', 'ignore'])
+  expect((await ui.find({ key: 'clear' }))?.props).toMatchObject({ label: '/clear', variant: 'primary' })
 })
 
-test('when the prompt box refuses, runs nothing and names the command', async ($, on) => {
-  const world = worldOf(on, 50)
-  world.hasComposer = false
+test('an edit after the commit is work in progress again: no /clear', async ($, on) => {
+  const { clock } = worldOf(on, 50)
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
 
   await run($, 'git commit -m x')
+  await $.tool.call({ tool: 'Edit', file_path: 'C:/p/a.ts', old_string: 'a', new_string: 'b' })
   await endTurn($)
-  const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
-  await ui.press({ key: 'clear' })
-  expect(world.toasts.at(-1)).toContain('/clear')
+  await clock.advance(TEN_MINUTES)
 
-  await ui.press({ key: 'compact' })
-  expect(world.toasts.at(-1)).toContain('/compact')
-  expect(world.compactions).toEqual([])
-  expect(await ui.find({ key: 'compact' })).toBeDefined()
+  expect(await buttonsOf(ui)).toEqual([])
 })
 
-test('warns after a long pause from 40%', async ($, on) => {
+test('recommends /compact after an hour away with work not committed, from 40%', async ($, on) => {
   const { clock } = worldOf(on, 50)
 
   await endTurn($)
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
   await clock.advance(HOUR - 1)
-  expect(await ui.find({ key: 'compact' })).toBe(undefined)
+  expect(await buttonsOf(ui)).toEqual([])
 
   await clock.advance(1)
-  expect(await ui.find({ type: 'Text', text: /Pausa larga.*50%/ })).toBeDefined()
+  expect(await buttonsOf(ui)).toEqual(['compact', 'ignore'])
 })
 
-test('a prompt sent before the pause is over cancels the warning', async ($, on) => {
+test('a prompt sent before the pause is over cancels the recommendation', async ($, on) => {
   const { clock } = worldOf(on, 50)
 
+  await run($, 'git commit -m x')
   await endTurn($)
-  await $.prompt.submit({ text: 'go on', wait: false, origin: { kind: 'composer' } })
+  await $.prompt.submit(NEXT_PROMPT)
   await clock.advance(2 * HOUR)
 
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
-  expect(await ui.find({ key: 'compact' })).toBe(undefined)
+  expect(await buttonsOf(ui)).toEqual([])
+})
+
+test('Ignorar hides the recommendation until there is a new reason', async ($, on) => {
+  worldOf(on, 65)
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+
+  await run($, 'npm test')
+  await endTurn($)
+  await ui.press({ key: 'ignore' })
+  expect(await buttonsOf(ui)).toEqual([])
+
+  await run($, 'npm test')
+  await endTurn($)
+  expect(await buttonsOf(ui)).toEqual(['compact', 'ignore'])
+})
+
+test('the button writes its command in the prompt box for the person to send', async ($, on) => {
+  const world = worldOf(on, 85)
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+
+  await endTurn($)
+  await ui.press({ key: 'compact' })
+  expect(world.fills[0]?.startsWith('/compact Conservá')).toBe(true)
+
+  await run($, 'git commit -m x')
+  await endTurn($)
+  await world.clock.advance(TEN_MINUTES)
+  await ui.press({ key: 'clear' })
+  expect(world.fills[1]).toBe('/clear')
+  expect(world.compactions).toEqual([])
+})
+
+test('when the prompt box refuses, runs nothing and names the command', async ($, on) => {
+  const world = worldOf(on, 85)
+  world.hasComposer = false
+  const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
+
+  await endTurn($)
+  await ui.press({ key: 'compact' })
+  expect(world.toasts.at(-1)).toContain('/compact')
+  expect(world.compactions).toEqual([])
+
+  await run($, 'git commit -m x')
+  await endTurn($)
+  await world.clock.advance(TEN_MINUTES)
+  await ui.press({ key: 'clear' })
+  expect(world.toasts.at(-1)).toContain('/clear')
 })
 
 test('names the tool call that put a large output in the context', async ($, on) => {

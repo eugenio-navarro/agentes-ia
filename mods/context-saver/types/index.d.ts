@@ -1,14 +1,20 @@
 /** A natural stopping point seen in the turn: a commit made, or tests passing. */
 export type Cut = 'commit' | 'tests'
 
-/** Why the band suggests acting on the context, most pressing first. */
-export type AdviceKind = 'urgent' | 'idle' | 'commit' | 'tests'
+/**
+ * Why the band recommends acting on the context: the work is saved and the person stepped
+ * away, the window is nearly full, a long pause let the cache lapse, or a natural cut.
+ */
+export type AdviceKind = 'done' | 'urgent' | 'idle' | 'cut'
+
+/** How long since the last turn: none yet, a break, or long enough for the cache to lapse. */
+export type Pause = 'none' | 'short' | 'long'
 
 /** What the advice is decided from; `percent` is null until the first response. */
 export type Signals = {
   percent: number | null
   cut: Cut | null
-  isIdle: boolean
+  pause: Pause
   hidden: AdviceKind | null
 }
 
