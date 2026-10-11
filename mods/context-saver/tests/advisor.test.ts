@@ -8,6 +8,8 @@ import {
   estimateTokens,
   figuresOf,
   filledCells,
+  messageOf,
+  offersClear,
   reportOf,
   resetIn,
   statusTextOf,
@@ -53,6 +55,24 @@ describe('adviceFor', () => {
   test('keeps a hidden advice hidden until a more pressing one comes', () => {
     expect(adviceFor(signals({ percent: 50, cut: 'commit', hidden: 'commit' }))).toBe(null)
     expect(adviceFor(signals({ percent: 85, cut: 'commit', hidden: 'commit' }))).toBe('urgent')
+  })
+})
+
+describe('the recommendation', () => {
+  const KINDS = ['urgent', 'idle', 'commit', 'tests'] as const
+
+  test('always names the command it recommends, first', () => {
+    for (const kind of KINDS) {
+      expect(messageOf(kind, 70), kind).toMatch(/^Recomendado: \/compact\. /)
+    }
+  })
+
+  test('offers /clear only where a change of subject is plausible, and says so', () => {
+    expect(KINDS.filter(offersClear)).toEqual(['idle', 'commit'])
+
+    for (const kind of KINDS) {
+      expect(messageOf(kind, 70).includes('/clear'), kind).toBe(offersClear(kind))
+    }
   })
 })
 

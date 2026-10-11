@@ -14,6 +14,7 @@ import {
   filledCells,
   formatCount,
   messageOf,
+  offersClear,
   reportOf,
   statusTextOf,
   windowLabelOf,
@@ -342,7 +343,9 @@ export const register: Register = on => {
             <Text color={kind === 'urgent' ? LEVEL_COLORS.danger : MUTED}>{messageOf(kind, percent)}</Text>
             <Box columnGap={1}>
               <Button key="compact" label="/compact" hotkey="1" variant="primary" onPress={() => void compact($)} />
-              <Button key="clear" label="/clear" hotkey="2" onPress={() => void clear($)} />
+              {offersClear(kind) && (
+                <Button key="clear" label="/clear" hotkey="2" onPress={() => void clear($)} />
+              )}
               <Button
                 key="hide"
                 label="Ocultar"

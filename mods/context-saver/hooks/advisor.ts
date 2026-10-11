@@ -94,17 +94,23 @@ export const afterFill = (filled: {
   return filled.refusal === 'no_composer' ? 'no-box' : 'refused'
 }
 
-/** The line the band shows for an advice. */
+/**
+ * Whether an advice also offers /clear: only where the person may be changing subject,
+ * after a commit or a long pause. The mod cannot tell, so it never recommends it.
+ */
+export const offersClear = (kind: AdviceKind): boolean => kind === 'idle' || kind === 'commit'
+
+/** The line the band shows for an advice: the command it recommends, then why. */
 export const messageOf = (kind: AdviceKind, percent: number): string => {
   switch (kind) {
     case 'urgent':
-      return `Contexto al ${percent}%: conviene compactar ahora, antes de la compactación automática.`
+      return `Recomendado: /compact. El contexto está al ${percent}% y conviene compactar ahora, antes de la compactación automática.`
     case 'idle':
-      return `Pausa larga con el contexto al ${percent}%: la caché probablemente venció y el próximo turno lo paga completo.`
+      return `Recomendado: /compact. Pausa larga con el contexto al ${percent}%: la caché probablemente venció y el próximo turno lo paga completo. Si cambiás de tema, usá /clear.`
     case 'commit':
-      return `Commit hecho con el contexto al ${percent}%. ¿Seguís con lo mismo (/compact) o cambiás de tema (/clear)?`
+      return `Recomendado: /compact. Commit hecho con el contexto al ${percent}%: es un buen corte. Si cambiás de tema, usá /clear.`
     case 'tests':
-      return `Tests en verde con el contexto al ${percent}%: buen momento para compactar.`
+      return `Recomendado: /compact. Tests en verde con el contexto al ${percent}%: es un buen corte para compactar.`
   }
 }
 

@@ -235,7 +235,10 @@ test('insists from 80% with no natural cut', async ($, on) => {
   await endTurn($)
 
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
-  expect(await ui.find({ type: 'Text', text: /85%.*compactar ahora/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^Recomendado: \/compact\. .*85%.*compactar ahora/})).toBeDefined()
+  expect(await ui.find({ key: 'compact' })).toBeDefined()
+  expect(await ui.find({ key: 'clear' }), 'a clear case offers no /clear').toBe(undefined)
+  expect(await ui.find({ key: 'hide' })).toBeDefined()
 })
 
 test('hides the advice when asked, and the next prompt drops a cut', async ($, on) => {
@@ -256,8 +259,9 @@ test('hides the advice when asked, and the next prompt drops a cut', async ($, o
 })
 
 test('writes the command in the prompt box for the person to send', async ($, on) => {
-  const world = worldOf(on, 85)
+  const world = worldOf(on, 50)
 
+  await run($, 'git commit -m x')
   await endTurn($)
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
   await ui.press({ key: 'compact' })
@@ -269,9 +273,10 @@ test('writes the command in the prompt box for the person to send', async ($, on
 })
 
 test('when the prompt box refuses, runs nothing and names the command', async ($, on) => {
-  const world = worldOf(on, 85)
+  const world = worldOf(on, 50)
   world.hasComposer = false
 
+  await run($, 'git commit -m x')
   await endTurn($)
   const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
   await ui.press({ key: 'clear' })
