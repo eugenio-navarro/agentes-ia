@@ -22,6 +22,13 @@ export const LIMITS = {
   rateLimitCaution: 60,
   /** A rate-limit window used this far or more is announced, once. */
   rateLimitWarn: 80,
+  /** A prompt of fewer words is a reply, not a subject: it is neither compared nor remembered. */
+  topicMinWords: 6,
+  /** How many earlier prompts a new one is compared with, and how much of each is sent. */
+  topicHistory: 3,
+  topicClipChars: 300,
+  /** The most the small model is asked in one session. */
+  topicAsksPerSession: 30,
   /** How often the band re-reads the engine's figures while nothing else does. */
   refreshMs: 60_000,
   /** The size of a gauge's bar where the surface draws vectors, in CSS pixels. */
@@ -52,20 +59,30 @@ export const cutOf = (command: string): Cut | null => {
 }
 
 /** Which advice the signals call for now, or null to stay quiet. */
-export const adviceFor = ({ percent, cut, pause, hidden }: Signals): AdviceKind | null => {
+export const adviceFor = ({ percent, cut, pause, hidden, topic }: Signals): AdviceKind | null => {
   if (percent === null || percent < LIMITS.quietBelow) {
     return null
   }
 
-  const kind = pressingOf(percent, cut, pause)
+  const kind = pressingOf(percent, cut, pause, topic)
 
   return kind === hidden ? null : kind
 }
 
-const pressingOf = (percent: number, cut: Cut | null, pause: Pause): AdviceKind | null => {
+const pressingOf = (
+  percent: number,
+  cut: Cut | null,
+  pause: Pause,
+  topic: string | null,
+): AdviceKind | null => {
   // Committed and then left alone: nothing in the conversation is unsaved work.
   if (cut === 'commit' && pause !== 'none') {
     return 'done'
+  }
+
+  // The earlier subject is dead weight: a compaction that keeps only the new one frees the most.
+  if (topic !== null) {
+    return 'topic'
   }
 
   if (percent >= LIMITS.urgentAt) {
@@ -85,6 +102,58 @@ const pressingOf = (percent: number, cut: Cut | null, pause: Pause): AdviceKind 
  */
 export const commandFor = (kind: AdviceKind): 'compact' | 'clear' =>
   kind === 'done' ? 'clear' : 'compact'
+
+/** A prompt as it is remembered and sent: one line, clipped. */
+export const clipPrompt = (text: string): string =>
+  text.trim().replace(/\s+/g, ' ').slice(0, LIMITS.topicClipChars)
+
+/** Whether a prompt states a subject: long enough, and not a slash command. */
+export const isSubstantial = (text: string): boolean =>
+  !text.trimStart().startsWith('/') && text.trim().split(/\s+/).length >= LIMITS.topicMinWords
+
+/**
+ * Whether asking the small model about a change of subject can pay for itself: there is
+ * enough context to be worth clearing, something to compare with, and the session's cap
+ * is not spent. Every check here is free.
+ */
+export const isWorthAsking = (ask: {
+  text: string
+  percent: number | null
+  known: number
+  asked: number
+}): boolean =>
+  ask.percent !== null &&
+  ask.percent >= LIMITS.quietBelow &&
+  ask.known > 0 &&
+  ask.asked < LIMITS.topicAsksPerSession &&
+  isSubstantial(ask.text)
+
+export const TOPIC_SYSTEM =
+  'Clasificás si el mensaje nuevo de un usuario continúa el trabajo de sus mensajes anteriores ' +
+  'o empieza un tema distinto. Respondé con una sola palabra: MISMO o NUEVO. Ante la duda, MISMO.'
+
+/** What the small model is asked: the earlier prompts, then the new one. */
+export const topicQuestion = (previous: readonly string[], next: string): string =>
+  [
+    'Mensajes anteriores del usuario:',
+    ...previous.map(one => `- ${clipPrompt(one)}`),
+    '',
+    'Mensaje nuevo:',
+    clipPrompt(next),
+  ].join('\n')
+
+/** The model's one-word answer; anything else, or both words at once, is no answer. */
+export const topicAnswer = (reply: string): 'new' | 'same' | null => {
+  const said = reply.toUpperCase()
+  const isNew = said.includes('NUEVO')
+
+  return isNew === said.includes('MISMO') ? null : isNew ? 'new' : 'same'
+}
+
+/** What a compaction is told after a change of subject: keep the new one only. */
+export const topicInstructions = (topic: string): string =>
+  `Cambio de tema. Conservá solo lo que sirva para el tema nuevo: «${topic}». ` +
+  'Descartá la conversación anterior a ese mensaje, salvo las decisiones o los archivos que el tema nuevo necesite.'
 
 /**
  * What became of a command written to the prompt box. Only `no_composer` says no box exists,
@@ -321,6 +390,11 @@ export const reportOf = (
       'Releídos enteros',
       repeated.map(([path, times]) => `${baseName(path)} ×${times}`),
     ),
+    ...(ledger.classifier.asked === 0
+      ? []
+      : [
+          `Detección de cambio de tema: ${ledger.classifier.asked} ${ledger.classifier.asked === 1 ? 'consulta' : 'consultas'}, ${formatCount(ledger.classifier.tokens)} tokens`,
+        ]),
   ]
 
   return [figures, groups.length === 0 ? [] : ['Qué ocupa el contexto', ...groups], spent]

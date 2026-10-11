@@ -4,10 +4,12 @@ import type { EngineInterface, Register, Timer, ToolCallInput } from 'claude-cod
 import {
   COMPACT_INSTRUCTIONS,
   LIMITS,
+  TOPIC_SYSTEM,
   adviceFor,
   afterFill,
   barCellsFor,
   barSvg,
+  clipPrompt,
   baseName,
   commandFor,
   cutOf,
@@ -15,14 +17,24 @@ import {
   figuresOf,
   filledCells,
   formatCount,
+  isSubstantial,
+  isWorthAsking,
   reportOf,
   statusTextOf,
+  topicAnswer,
+  topicInstructions,
+  topicQuestion,
   windowLabelOf,
 } from './advisor'
 import type { AdviceKind, Gauge, Level, Ledger, Signals } from '../types'
 
-const QUIET: Signals = { percent: null, cut: null, pause: 'none', hidden: null }
-const EMPTY: Ledger = { bigOutputs: [], fullReads: {} }
+const QUIET: Signals = { percent: null, cut: null, pause: 'none', hidden: null, topic: null }
+const EMPTY: Ledger = {
+  bigOutputs: [],
+  fullReads: {},
+  prompts: [],
+  classifier: { asked: 0, tokens: 0 },
+}
 
 const signals = atom({ plugin: 'context-saver', key: 'signals' } as const, QUIET)
 const ledger = atom({ plugin: 'context-saver', key: 'ledger' } as const, EMPTY)
@@ -107,7 +119,8 @@ const noteEdit = async ($: EngineInterface, e: ToolCallInput) => {
 const startOver = async ($: EngineInterface) => {
   stopPauseTimers()
   await update($, signals, () => QUIET)
-  await update($, ledger, () => EMPTY)
+  // What the detection spent is the session's, not the conversation's: it outlives a compaction.
+  await update($, ledger, now => ({ ...EMPTY, classifier: now.classifier }))
   await update($, figures, () => null)
   setStatus($, undefined)
 }
@@ -196,8 +209,8 @@ const noteWholeRead = async ($: EngineInterface, e: ToolCallInput) => {
   }
 }
 
-const compact = async ($: EngineInterface) => {
-  const outcome = afterFill(await $.prompt.fill({ text: `/compact ${COMPACT_INSTRUCTIONS}` }))
+const compact = async ($: EngineInterface, instructions: string) => {
+  const outcome = afterFill(await $.prompt.fill({ text: `/compact ${instructions}` }))
 
   if (outcome === 'written') {
     return
@@ -210,7 +223,7 @@ const compact = async ($: EngineInterface) => {
   }
 
   try {
-    const done = await $.session.compact({ instructions: COMPACT_INSTRUCTIONS })
+    const done = await $.session.compact({ instructions })
 
     if (done.skip === undefined) {
       await startOver($)
@@ -227,6 +240,49 @@ const clear = async ($: EngineInterface) => {
 
   if (outcome !== 'written') {
     $.ui.toast('Escribí /clear para limpiar la conversación.', { timeoutMs: 8000 })
+  }
+}
+
+/**
+ * Asks the small model whether a prompt changes the subject, only where the answer can
+ * matter, and notes it. The answer never acts: it only decides what the band recommends.
+ */
+const noteTopic = async ($: EngineInterface, text: string) => {
+  if (!isSubstantial(text)) {
+    return
+  }
+
+  const { prompts, classifier } = await read($, ledger)
+  const { percent } = await read($, signals)
+  const remembered = (list: readonly string[]) => [...list, clipPrompt(text)].slice(-LIMITS.topicHistory)
+
+  if (!isWorthAsking({ text, percent, known: prompts.length, asked: classifier.asked })) {
+    await update($, ledger, now => ({ ...now, prompts: remembered(now.prompts) }))
+
+    return
+  }
+
+  const reply = await $.model.complete({
+    model: 'haiku',
+    system: TOPIC_SYSTEM,
+    prompt: topicQuestion(prompts, text),
+    maxTokens: 16,
+    effort: 'low',
+    timeoutMs: 15_000,
+  })
+  const answer = reply.isAnswered ? topicAnswer(reply.text) : null
+  const { input_tokens, output_tokens, cache_read_input_tokens, cache_creation_input_tokens } = reply.usage
+  const tokens = input_tokens + output_tokens + cache_read_input_tokens + cache_creation_input_tokens
+
+  await update($, ledger, now => ({
+    ...now,
+    // A new subject is what later prompts are compared with; the old one is left behind.
+    prompts: answer === 'new' ? [clipPrompt(text)] : remembered(now.prompts),
+    classifier: { asked: now.classifier.asked + 1, tokens: now.classifier.tokens + tokens },
+  }))
+
+  if (answer !== null) {
+    await update($, signals, (now): Signals => ({ ...now, topic: answer === 'new' ? clipPrompt(text) : null }))
   }
 }
 
@@ -263,7 +319,14 @@ export const register: Register = on => {
     }))
     await refresh($)
 
-    return next(e)
+    // The prompt goes on its way first: asking about its subject never holds it back.
+    const entered = await next(e)
+
+    if (e.origin.kind === 'composer' || e.origin.kind === 'bridge') {
+      await noteTopic($, e.text)
+    }
+
+    return entered
   })
 
   on('tool.call', async ($, e, next) => {
@@ -375,12 +438,23 @@ export const register: Register = on => {
               key={command}
               label={`/${command}`}
               variant="primary"
-              onPress={() => void (command === 'clear' ? clear($) : compact($))}
+              onPress={() =>
+                void (command === 'clear'
+                  ? clear($)
+                  : compact($, now.topic !== null && kind === 'topic' ? topicInstructions(now.topic) : COMPACT_INSTRUCTIONS))
+              }
             />
             <Button
               key="ignore"
               label="Ignorar"
-              onPress={() => void update($, signals, seen => ({ ...seen, hidden: kind }))}
+              onPress={() =>
+                // Ignoring a change of subject settles it: it is not brought up again.
+                void update($, signals, seen => ({
+                  ...seen,
+                  hidden: kind,
+                  topic: kind === 'topic' ? null : seen.topic,
+                }))
+              }
             />
           </Box>
         )}

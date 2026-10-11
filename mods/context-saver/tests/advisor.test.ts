@@ -10,10 +10,14 @@ import {
   estimateTokens,
   figuresOf,
   filledCells,
+  isWorthAsking,
   reportOf,
   resetIn,
   shortCount,
   statusTextOf,
+  topicAnswer,
+  topicInstructions,
+  topicQuestion,
 } from '../hooks/advisor'
 import type { Signals } from '../types'
 
@@ -22,6 +26,7 @@ const signals = (over: Partial<Signals>): Signals => ({
   cut: null,
   pause: 'none',
   hidden: null,
+  topic: null,
   ...over,
 })
 
@@ -69,6 +74,47 @@ describe('commandFor', () => {
       'compact',
       'clear',
     ])
+  })
+})
+
+describe('a change of subject', () => {
+  const LONG = 'ahora quiero armar el script de despliegue del servidor'
+  const ask = { text: LONG, percent: 50, known: 2, asked: 0 }
+
+  test('is the first thing recommended once detected, from 40%, with a /compact', () => {
+    expect(adviceFor(signals({ percent: 50, topic: LONG }))).toBe('topic')
+    expect(adviceFor(signals({ percent: 85, topic: LONG })), 'frees more than a plain one').toBe('topic')
+    expect(adviceFor(signals({ percent: 39, topic: LONG }))).toBe(null)
+    expect(commandFor('topic')).toBe('compact')
+  })
+
+  test('is asked about only when the answer can matter', () => {
+    expect(isWorthAsking(ask)).toBe(true)
+    expect(isWorthAsking({ ...ask, percent: 39 }), 'little to clear').toBe(false)
+    expect(isWorthAsking({ ...ask, percent: null }), 'no reading yet').toBe(false)
+    expect(isWorthAsking({ ...ask, known: 0 }), 'nothing to compare with').toBe(false)
+    expect(isWorthAsking({ ...ask, asked: 30 }), 'the session cap').toBe(false)
+    expect(isWorthAsking({ ...ask, text: 'dale, hacelo así' }), 'a short reply').toBe(false)
+    expect(isWorthAsking({ ...ask, text: '/compact ahora mismo por favor y gracias' }), 'a command').toBe(false)
+  })
+
+  test('is put to the model as the earlier prompts and the new one, each clipped', () => {
+    const question = topicQuestion(['uno   con\nespacios', 'x'.repeat(500)], LONG)
+
+    expect(question).toContain('- uno con espacios\n')
+    expect(question).toContain('- ' + 'x'.repeat(300) + '\n')
+    expect(question).not.toContain('x'.repeat(301))
+    expect(question.endsWith('Mensaje nuevo:\n' + LONG)).toBe(true)
+  })
+
+  test('is read from a one-word answer, and anything unclear is no answer', () => {
+    expect(['NUEVO', ' nuevo.', 'MISMO', 'Mismo'].map(topicAnswer)).toEqual(['new', 'new', 'same', 'same'])
+    expect(['no sé', '', 'MISMO, no NUEVO'].map(topicAnswer)).toEqual([null, null, null])
+  })
+
+  test('asks the compaction to keep only the new subject', () => {
+    expect(topicInstructions(LONG)).toContain(LONG)
+    expect(topicInstructions(LONG).startsWith('Cambio de tema')).toBe(true)
   })
 })
 
@@ -262,7 +308,7 @@ describe('reportOf', () => {
       { name: 'mcp__drive__a', serverName: 'drive', tokens: 9_000, isLoaded: false },
     ],
   }
-  const QUIET = { bigOutputs: [], fullReads: {} }
+  const QUIET = { bigOutputs: [], fullReads: {}, prompts: [], classifier: { asked: 0, tokens: 0 } }
 
   test('opens with one bar per figure: context, each usage window, then the cost', () => {
     const lines = reportOf(usage, breakdown, QUIET, NOW).split('\n')
@@ -301,6 +347,7 @@ describe('reportOf', () => {
       usage,
       breakdown,
       {
+        ...QUIET,
         bigOutputs: [{ tool: 'Read', target: 'big.ts', tokens: 12_000 }],
         fullReads: { 'C:/p/a.ts': 3, 'C:/p/b.ts': 1 },
       },

@@ -29,6 +29,8 @@ type World = {
   toasts: string[]
   fills: string[]
   compactions: (string | undefined)[]
+  topicAnswer: string | null
+  asked: string[]
 }
 
 const usageAt = (percent: number | undefined): SessionUsage => ({
@@ -53,6 +55,8 @@ const worldOf = (on: On, percent: number | undefined): World => {
     toasts: [],
     fills: [],
     compactions: [],
+    topicAnswer: 'MISMO',
+    asked: [],
   }
 
   on('session.usage', () => ({ value: world.usage }))
@@ -82,6 +86,16 @@ const worldOf = (on: On, percent: number | undefined): World => {
     }
 
     return { isFilled: world.hasComposer }
+  })
+  on('model.complete', ($, e) => {
+    world.asked.push(e.prompt)
+    const usage = { input_tokens: 300, output_tokens: 2, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 }
+    const reply =
+      world.topicAnswer === null
+        ? { isAnswered: false, reason: 'empty-reply', usage }
+        : { isAnswered: true, text: world.topicAnswer, usage }
+
+    return { value: reply as never }
   })
   on('session.compact', ($, e) => {
     world.compactions.push(e.instructions)
@@ -344,6 +358,99 @@ test('when the prompt box refuses, runs nothing and names the command', async ($
   await world.clock.advance(TEN_MINUTES)
   await ui.press({ key: 'clear' })
   expect(world.toasts.at(-1)).toContain('/clear')
+})
+
+const FIRST_PROMPT = 'arreglá el cálculo de impuestos en la factura por favor'
+const OTHER_PROMPT = 'ahora quiero armar el script de despliegue del servidor de producción'
+
+const send = ($: Engine, text: string) =>
+  $.prompt.submit({ text, wait: false, origin: { kind: 'composer' } })
+
+test('asks the small model about a change of subject only when it can matter', async ($, on) => {
+  const world = worldOf(on, 30)
+
+  await send($, FIRST_PROMPT)
+  await send($, OTHER_PROMPT)
+  expect(world.asked, 'under 40% nothing is worth clearing').toEqual([])
+
+  world.usage = usageAt(50)
+  await send($, 'dale')
+  await send($, '/uso ahora mismo por favor y gracias')
+  expect(world.asked, 'short replies and commands cost nothing').toEqual([])
+
+  await send($, OTHER_PROMPT)
+  expect(world.asked).toHaveLength(1)
+  expect(world.asked[0]).toContain(FIRST_PROMPT)
+  expect(world.asked[0]).toContain('Mensaje nuevo:\n' + OTHER_PROMPT)
+})
+
+test('after a change of subject, recommends a /compact that keeps only the new one', async ($, on) => {
+  const world = worldOf(on, 50)
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+
+  await send($, FIRST_PROMPT)
+  await send($, 'y agregá también un test para el redondeo de centavos')
+  await endTurn($)
+  expect(await buttonsOf(ui), 'the same subject').toEqual([])
+
+  world.topicAnswer = 'NUEVO'
+  await send($, OTHER_PROMPT)
+  await endTurn($)
+  expect(await buttonsOf(ui)).toEqual(['compact', 'ignore'])
+
+  await ui.press({ key: 'compact' })
+  expect(world.fills.at(-1)?.startsWith('/compact Cambio de tema')).toBe(true)
+  expect(world.fills.at(-1)).toContain(OTHER_PROMPT)
+  expect(world.compactions, 'the person sends it, not the mod').toEqual([])
+})
+
+test('Ignorar on a change of subject drops it, and later prompts are compared with the new subject', async ($, on) => {
+  const world = worldOf(on, 50)
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+
+  await send($, FIRST_PROMPT)
+  world.topicAnswer = 'NUEVO'
+  await send($, OTHER_PROMPT)
+  await endTurn($)
+  await ui.press({ key: 'ignore' })
+
+  world.topicAnswer = 'MISMO'
+  await send($, 'dale')
+  await endTurn($)
+  expect(await buttonsOf(ui), 'ignored').toEqual([])
+
+  await send($, 'y que el despliegue corra las migraciones antes de levantar')
+  expect(world.asked.at(-1)).toContain(OTHER_PROMPT)
+  expect(world.asked.at(-1)).not.toContain(FIRST_PROMPT)
+})
+
+test('an unclear or failed answer from the model recommends nothing', async ($, on) => {
+  const world = worldOf(on, 50)
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+
+  await send($, FIRST_PROMPT)
+  for (const answer of ['no estoy seguro', null]) {
+    world.topicAnswer = answer
+    await send($, OTHER_PROMPT)
+    await endTurn($)
+    expect(await buttonsOf(ui), String(answer)).toEqual([])
+  }
+})
+
+test('/uso says what the detection itself spent', async ($, on) => {
+  worldOf(on, 50)
+
+  await $.session.start({ cwd: 'C:/p', surface: 'terminal', isInteractive: true })
+  await send($, FIRST_PROMPT)
+  await send($, OTHER_PROMPT)
+  const ran = await $.command.run({
+    command: 'uso',
+    args: '',
+    origin: { kind: 'composer' },
+    presentation: { isFullscreen: false, columns: 80 },
+  })
+
+  expect(ran.text).toContain('Detección de cambio de tema: 1 consulta, 302 tokens')
 })
 
 test('names the tool call that put a large output in the context', async ($, on) => {
