@@ -88,6 +88,22 @@ export const ledgerFrom = (stored: Partial<Ledger> | null | undefined): Ledger =
   agents: Array.isArray(stored?.agents) ? stored.agents : [],
 })
 
+/** The usage windows as kept across sessions: whatever of the stored value is one. */
+export const windowsFrom = (stored: unknown): SessionRateLimit[] =>
+  (Array.isArray(stored) ? stored : []).flatMap((one: unknown) => {
+    if (typeof one !== 'object' || one === null) {
+      return []
+    }
+
+    const { kind, percentUsed, resetsAt } = one as Record<string, unknown>
+
+    if (typeof kind !== 'string' || typeof percentUsed !== 'number') {
+      return []
+    }
+
+    return [{ kind, percentUsed, ...(typeof resetsAt === 'string' ? { resetsAt } : {}) }]
+  })
+
 /**
  * The usage windows to show: those the engine reports now, in the order first seen, and any
  * it reported before and has left out since. The engine drops a window once it resets, so a

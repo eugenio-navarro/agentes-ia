@@ -23,6 +23,7 @@ import {
   topicAnswer,
   topicInstructions,
   topicQuestion,
+  windowsFrom,
   windowsShown,
   withoutName,
 } from '../hooks/advisor'
@@ -176,6 +177,25 @@ describe('windowsShown', () => {
       week,
     ])
     expect(windowsShown([], [week], AT + 3 * 60_000), 'no reset time known').toEqual([week])
+  })
+})
+
+describe('windowsFrom', () => {
+  test('reads the usage windows kept across sessions, and drops whatever is not one', () => {
+    const kept = [
+      { kind: 'five_hour', percentUsed: 42, resetsAt: '2026-10-12T20:00:00Z' },
+      { kind: 'seven_day', percentUsed: 9 },
+      { kind: 'broken' },
+      'text',
+      null,
+    ]
+
+    expect(windowsFrom(kept)).toEqual([
+      { kind: 'five_hour', percentUsed: 42, resetsAt: '2026-10-12T20:00:00Z' },
+      { kind: 'seven_day', percentUsed: 9 },
+    ])
+    expect(windowsFrom(undefined)).toEqual([])
+    expect(windowsFrom({ kind: 'five_hour', percentUsed: 42 })).toEqual([])
   })
 })
 

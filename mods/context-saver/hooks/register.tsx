@@ -33,6 +33,7 @@ import {
   topicInstructions,
   topicQuestion,
   windowLabelOf,
+  windowsFrom,
   windowsShown,
   withoutName,
 } from './advisor'
@@ -41,6 +42,9 @@ import type { AdviceKind, Gauge, Level, Ledger, Signals } from '../types'
 const QUIET = QUIET_SIGNALS
 const IGNORE_LABEL = 'Ignorar'
 const PLUGIN = 'context-saver'
+// Where the usage windows are kept across sessions, and what this module last wrote there.
+const WINDOWS_KEY = 'windows'
+let savedWindows = ''
 const EMPTY = EMPTY_LEDGER
 
 const signals = atom({ plugin: 'context-saver', key: 'signals' } as const, QUIET)
@@ -144,11 +148,20 @@ const startOver = async ($: EngineInterface) => {
  */
 const refresh = async ($: EngineInterface) => {
   const reported = await $.session.usage()
-  const kept = ledgerFrom(await read($, ledger)).windows
+  const noted = ledgerFrom(await read($, ledger)).windows
+  // The windows are the account's, not this session's. The engine reports them only once a
+  // first response has come: until then they read as any session last saw them.
+  const kept =
+    noted.length > 0 ? noted : windowsFrom(await $.store.get(WINDOWS_KEY).catch(() => undefined))
   const windows = windowsShown(reported.rateLimits, kept, await $.clock.now())
 
-  if (JSON.stringify(windows) !== JSON.stringify(kept)) {
+  if (JSON.stringify(windows) !== JSON.stringify(noted)) {
     await update($, ledger, now => ({ ...ledgerFrom(now), windows }))
+  }
+
+  if (reported.rateLimits.length > 0 && JSON.stringify(windows) !== savedWindows) {
+    savedWindows = JSON.stringify(windows)
+    await $.store.set(WINDOWS_KEY, windows).catch(() => undefined)
   }
 
   const usage = { ...reported, rateLimits: windows }

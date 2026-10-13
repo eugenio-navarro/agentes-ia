@@ -28,6 +28,8 @@ type World = {
   statuses: (string | undefined)[]
   toasts: string[]
   commands: string[]
+  store: Record<string, unknown>
+  stored: number
   agents: { id: string; type: string; description: string }[]
   compactions: (string | undefined)[]
   topicAnswer: string | null
@@ -55,6 +57,8 @@ const worldOf = (on: On, percent: number | undefined): World => {
     statuses: [],
     toasts: [],
     commands: [],
+    store: {},
+    stored: 0,
     agents: [],
     compactions: [],
     topicAnswer: 'MISMO',
@@ -73,6 +77,13 @@ const worldOf = (on: On, percent: number | undefined): World => {
     return { value: undefined }
   })
   on('command.register', ($, e) => ({ value: { command: e.name } }))
+  on('store.get', ($, e) => ({ value: world.store[e.key] }))
+  on('store.set', ($, e) => {
+    world.store[e.key] = e.value
+    world.stored += 1
+
+    return { value: undefined }
+  })
   on('agent.list', () => ({ value: world.agents.map(one => ({ ...one, status: 'running' })) as never }))
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('session.end', ($, e) => ({ sessionId: e.sessionId }) as never)
@@ -665,6 +676,48 @@ test('keeps a usage window on screen at 0% after the engine stops reporting it',
   await world.clock.advance(3 * 60_000)
   await endTurn($)
   expect(await texts(), 'still there, reset to zero').toEqual(expect.arrayContaining(['5h', '0%']))
+})
+
+test('shows the usage windows from the first moment, as any session last saw them', async ($, on) => {
+  const world = worldOf(on, 20)
+  world.store.windows = [
+    { kind: 'five_hour', percentUsed: 42, resetsAt: new Date(60 * 60_000).toISOString() },
+    { kind: 'seven_day', percentUsed: 9 },
+  ]
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  const texts = async () => (await ui.findAll({ type: 'Text' })).map(one => one.text)
+
+  // The engine reports no window until a first response has come.
+  await $.session.start({ cwd: 'C:/p', surface: 'terminal', isInteractive: true })
+  expect(await texts(), 'before any response').toEqual(expect.arrayContaining(['5h', '42%', '7d', '9%']))
+  expect(world.stored, 'nothing new to keep yet').toBe(0)
+
+  world.usage = {
+    ...usageAt(20),
+    rateLimits: [
+      { kind: 'five_hour', percentUsed: 50 },
+      { kind: 'seven_day', percentUsed: 10 },
+    ],
+  }
+  await endTurn($)
+  expect(await texts(), "the engine's own reading takes their place").toEqual(
+    expect.arrayContaining(['5h', '50%', '7d', '10%']),
+  )
+  expect(world.store.windows, 'and is kept for the next session').toEqual(world.usage.rateLimits)
+
+  await endTurn($)
+  expect(world.stored, 'kept once while it stays the same').toBe(1)
+})
+
+test('a window kept from before reads 0% once its reset time has passed', async ($, on) => {
+  const world = worldOf(on, 20)
+  world.store.windows = [{ kind: 'five_hour', percentUsed: 42, resetsAt: new Date(60_000).toISOString() }]
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+
+  await world.clock.advance(2 * 60_000)
+  await $.session.start({ cwd: 'C:/p', surface: 'terminal', isInteractive: true })
+
+  expect((await ui.findAll({ type: 'Text' })).map(one => one.text)).toEqual(expect.arrayContaining(['5h', '0%']))
 })
 
 test('announces a rate-limit window near its cap once', async ($, on) => {
