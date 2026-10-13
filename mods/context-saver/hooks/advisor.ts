@@ -255,7 +255,7 @@ export const figuresOf = ({ context, cost, rateLimits }: SessionUsage): Figures 
   }
 
   return {
-    context: gaugeOf('contexto', context.percent, LIMITS.compactAt, LIMITS.urgentAt),
+    context: gaugeOf('Contexto', context.percent, LIMITS.compactAt, LIMITS.urgentAt),
     limits: rateLimits.map(limit =>
       gaugeOf(
         windowLabelOf(limit.kind),

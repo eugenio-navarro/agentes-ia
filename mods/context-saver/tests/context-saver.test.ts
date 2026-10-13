@@ -138,7 +138,7 @@ test('draws context and cost in the band above the prompt after a turn', async (
     expect(await ui.find({ type: 'Text', text: /^42%$/ }), 'before a turn').toBe(undefined)
 
     await endTurn($)
-    expect((await ui.find({ type: 'Text', text: /^contexto$/ }))?.props).toMatchObject({ color: '#9ca3af' })
+    expect((await ui.find({ type: 'Text', text: /^Contexto$/ }))?.props).toMatchObject({ color: '#9ca3af' })
     expect((await ui.find({ type: 'Text', text: /^42%$/ }))?.props).toMatchObject({ bold: true })
     if (surface === 'terminal') {
       const texts = await ui.findAll({ type: 'Text' })
@@ -168,7 +168,7 @@ test('colours the gauges by level', async ($, on) => {
   const bars = (await ui.findAll({ type: 'Svg' })).map(bar => String(bar.props.source))
   expect(bars.some(source => source.includes('#f87171')), 'a danger bar').toBe(true)
   expect(bars.some(source => source.includes('#fbbf24')), 'a warn bar').toBe(true)
-  expect((await ui.find({ type: 'Text', text: /^contexto$/ }))?.props, 'danger colours the label').toMatchObject({
+  expect((await ui.find({ type: 'Text', text: /^Contexto$/ }))?.props, 'danger colours the label').toMatchObject({
     color: '#f87171',
   })
   expect((await ui.find({ type: 'Text', text: /^85%$/ }))?.props).toMatchObject({ color: '#f87171', bold: true })
@@ -180,7 +180,7 @@ test('uses the status line only where the band is not drawn', async ($, on) => {
   const world = worldOf(on, 42)
 
   await endTurn($)
-  expect(world.statuses.at(-1), 'no band yet').toBe('contexto 42% · Precio: $1.50')
+  expect(world.statuses.at(-1), 'no band yet').toBe('Contexto 42% · Precio: $1.50')
 
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
   await endTurn($)

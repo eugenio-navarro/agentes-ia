@@ -282,7 +282,7 @@ describe('estimateTokens', () => {
 
 describe('rowCellsOf', () => {
   const figures: Figures = {
-    context: { label: 'contexto', percent: 78, level: 'warn' },
+    context: { label: 'Contexto', percent: 78, level: 'warn' },
     limits: [
       { label: '5 h', percent: 0, level: 'ok' },
       { label: '7 días', percent: 85, level: 'danger' },
@@ -341,7 +341,7 @@ describe('figuresOf', () => {
     })
 
     expect(figures).toEqual({
-      context: { label: 'contexto', percent: 42, level: 'ok' },
+      context: { label: 'Contexto', percent: 42, level: 'ok' },
       limits: [
         { label: '5h', percent: 30, level: 'ok' },
         { label: '7d', percent: 12, level: 'ok' },
