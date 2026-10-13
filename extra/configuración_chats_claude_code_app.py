@@ -121,6 +121,14 @@ def buscar_indice():
     return mejor
 
 
+def sin_limite_de_largo(path):
+    """La misma ruta, que en Windows se puede leer aunque supere los 260 caracteres."""
+    absoluta = os.path.abspath(path)
+    if sys.platform != "win32" or absoluta.startswith("\\\\"):
+        return Path(absoluta)
+    return Path("\\\\?\\" + absoluta)
+
+
 # --- utilidades --------------------------------------------------------------
 
 def leer_json(path):
@@ -456,23 +464,28 @@ def sincronizar(indice=None, simular=False, salida=print):
     cache, cache_cambio, nuevos = cargar_cache(), False, 0
     if cache.get("_version") != VERSION_CACHE:
         cache["_version"], cache_cambio = VERSION_CACHE, True
-    for jsonl in sorted((config_dir() / "projects").glob("*/*.jsonl")):
+    # El nombre de cada carpeta de proyecto es la ruta entera del proyecto: las de carpetas
+    # anidadas superan los 260 caracteres y Windows no las lista ni las lee con la ruta normal.
+    proyectos = config_dir() / "projects"
+    proyectos_sin_limite = sin_limite_de_largo(proyectos)
+    for jsonl in sorted(proyectos_sin_limite.glob("*/*.jsonl")):
         cli_id = jsonl.stem
         if not UUID_RE.fullmatch(cli_id):
             continue
         clave = cli_id.lower()
         if clave in indexados or clave in borrados or clave in ya_importados:
             continue
+        en_cache = str(proyectos / jsonl.relative_to(proyectos_sin_limite))
         st = jsonl.stat()
         firma = [st.st_mtime_ns, st.st_size]
-        if cache.get(str(jsonl)) == firma:
+        if cache.get(en_cache) == firma:
             continue
         try:
             datos, motivo = analizar(jsonl)
         except OSError:
             continue
         if datos is None:
-            cache[str(jsonl)], cache_cambio = firma, True
+            cache[en_cache], cache_cambio = firma, True
             continue
         entrada = nueva_entrada(plantilla, cli_id, datos)
         destino = indice / (entrada["sessionId"] + ".json")
