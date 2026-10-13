@@ -112,6 +112,15 @@ class ModsTest(unittest.TestCase):
             self.assertFalse((mod / "tests").exists())  # los tests del mod se quedan en el repo
             self.assertNotIn(b"\r\n", (mod / "hooks" / "register.tsx").read_bytes())  # siempre LF
 
+    def test_el_repo_es_un_origen_de_mods_con_los_mismos_mods(self):
+        """La raíz del repo sirve de origen (`claude plugin marketplace add <usuario>/agentes-ia`), sin instalador."""
+        raiz = json.loads((inst.REPO / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8"))
+        local = json.loads((inst.REPO / "mods" / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8"))
+        self.assertEqual([mod["name"] for mod in raiz["plugins"]], [mod["name"] for mod in local["plugins"]])
+        for mod in raiz["plugins"]:
+            self.assertTrue((inst.REPO / mod["source"] / ".claude-plugin" / "plugin.json").exists(), mod["source"])
+        self.assertNotEqual(raiz["name"], local["name"])  # dos nombres: en una misma PC no se pisan
+
     def registrar(self, origenes, instalados, simular=False, hay_cli=True):
         """Corre registrar_mods contra una CLI falsa; devuelve los comandos que cambian algo y la salida."""
         comandos = []

@@ -57,6 +57,17 @@ pedile a tu IA: *"Instalá los agentes siguiendo extra/INSTALAR.md"*.
 y los registra en Claude Code con `claude plugin`. Claude lee esa copia, así que el repo se puede mover
 o tener cambios a medio hacer sin afectar tus sesiones.
 
+En otra máquina (un servidor por SSH, otra PC) no hace falta el instalador: el repo es un origen de mods
+de Claude Code. Con estos dos comandos queda instalado para todas las sesiones de esa máquina:
+
+```
+claude plugin marketplace add eugenio-navarro/agentes-ia
+claude plugin install context-saver@agentes-ia
+```
+
+Para actualizarlo ahí: `claude plugin update context-saver@agentes-ia`. En la PC donde ya corre el
+instalador no hace falta: usar las dos formas a la vez carga el mod dos veces.
+
 Para probar un mod: `claude plugin validate mods/context-saver` y `claude plugin test mods/context-saver`.
 Después de editarlo, subí la versión en su `plugin.json`, corré el instalador y recargá los plugins
 (`/reload-plugins`) o reiniciá la app.
