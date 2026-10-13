@@ -31,6 +31,8 @@ export const LIMITS = {
   topicAsksPerSession: 30,
   /** How often the band re-reads the engine's figures while nothing else does. */
   refreshMs: 60_000,
+  /** How long a reading of the usage windows passes for current; older, it is drawn as approximate. */
+  freshMs: 30 * 60_000,
   /** A bar's length in cells: no shorter than reads as a bar, no longer than looks like one. */
   barMinCells: 7,
   barMaxCells: 16,
@@ -128,6 +130,51 @@ export const windowsShown = (
 
     return hasReset ? { kind, percentUsed: 0 } : last
   })
+}
+
+/** A reading of the usage windows, and when it was taken in the clock's milliseconds; 0, never. */
+export type Reading = { at: number; windows: SessionRateLimit[] }
+
+/** The reading kept across sessions; a bare list, as 0.13.2 kept it, is one with no time. */
+export const readingFrom = (stored: unknown): Reading => {
+  if (Array.isArray(stored)) {
+    return { at: 0, windows: windowsFrom(stored) }
+  }
+
+  if (typeof stored !== 'object' || stored === null) {
+    return { at: 0, windows: [] }
+  }
+
+  const { at, windows } = stored as Record<string, unknown>
+
+  return { at: typeof at === 'number' ? at : 0, windows: windowsFrom(windows) }
+}
+
+/**
+ * The usage windows to show now, which of them are in doubt, and when the reading is from.
+ * They are the account's, not a session's, and the engine reports them only with a response:
+ * so the newer of its own reading and the one any session last kept is shown. A window is in
+ * doubt when its reading is old, or when its reset time has passed and its 0% is assumed.
+ */
+export const windowsNow = (
+  own: Reading,
+  kept: Reading,
+  nowMs: number,
+): { windows: SessionRateLimit[]; stale: string[]; at: number } => {
+  const isOwn = own.windows.length > 0 && own.at >= kept.at
+  const reported = isOwn ? own.windows : []
+  const windows = windowsShown(reported, kept.windows, nowMs)
+  const stale = windows
+    .map(one => one.kind)
+    .filter(kind => {
+      const source = reported.some(one => one.kind === kind) ? own : kept
+      const read = source.windows.find(one => one.kind === kind)
+      const hasReset = read?.resetsAt !== undefined && Date.parse(read.resetsAt) <= nowMs
+
+      return hasReset || nowMs - source.at > LIMITS.freshMs
+    })
+
+  return { windows, stale, at: isOwn ? own.at : kept.at }
 }
 
 /** The part of a breakdown the report reads. */
@@ -265,33 +312,58 @@ const gaugeOf = (label: string, percent: number, warnAt: number, dangerAt: numbe
 })
 
 /** What the band draws, or null before the engine has a figure to show. */
-export const figuresOf = ({ context, cost, rateLimits }: SessionUsage): Figures | null => {
+export const figuresOf = (
+  { context, cost, rateLimits }: SessionUsage,
+  stale: readonly string[] = [],
+): Figures | null => {
   if (context.percent === undefined) {
     return null
   }
 
   return {
     context: gaugeOf('Contexto', context.percent, LIMITS.compactAt, LIMITS.urgentAt),
-    limits: rateLimits.map(limit =>
-      gaugeOf(
-        windowLabelOf(limit.kind),
-        limit.percentUsed,
-        LIMITS.rateLimitCaution,
-        LIMITS.rateLimitWarn,
-      ),
-    ),
+    limits: rateLimits.map(limit => ({
+      ...gaugeOf(windowLabelOf(limit.kind), limit.percentUsed, LIMITS.rateLimitCaution, LIMITS.rateLimitWarn),
+      ...(stale.includes(limit.kind) ? { isStale: true as const } : {}),
+    })),
     cost: cost === undefined ? null : `$${cost.usd.toFixed(2)}`,
   }
 }
+
+/** A gauge's percentage as written: one in doubt is marked approximate. */
+export const percentTextOf = (gauge: Gauge): string => `${gauge.isStale === true ? '~' : ''}${gauge.percent}%`
 
 /** The figures as one plain line, for a surface that draws no band. */
 export const statusTextOf = (figures: Figures | null): string | undefined =>
   figures === null
     ? undefined
     : [figures.context, ...figures.limits]
-        .map(gauge => `${gauge.label} ${gauge.percent}%`)
+        .map(gauge => `${gauge.label} ${percentTextOf(gauge)}`)
         .concat(figures.cost === null ? [] : [costTextOf(figures.cost)])
         .join(' · ')
+
+/** A span of whole minutes in its two largest units: `2 h 5 min`. */
+const spanOf = (minutes: number): string => {
+  const units = [
+    [Math.floor(minutes / 1440), 'd'],
+    [Math.floor(minutes / 60) % 24, 'h'],
+    [minutes % 60, 'min'],
+  ] as const
+  const first = units.findIndex(([amount]) => amount > 0)
+
+  return units
+    .slice(first, first + 2)
+    .filter(([amount]) => amount > 0)
+    .map(([amount, unit]) => `${amount} ${unit}`)
+    .join(' ')
+}
+
+/** How long ago `ms` is, in its two largest units. */
+export const agoOf = (ms: number): string => {
+  const minutes = Math.floor(ms / 60_000)
+
+  return minutes < 1 ? 'recién' : `hace ${spanOf(minutes)}`
+}
 
 /** How long until `iso`, in its two largest units; null for a date that does not parse. */
 export const resetIn = (iso: string, nowMs: number): string | null => {
@@ -305,18 +377,7 @@ export const resetIn = (iso: string, nowMs: number): string | null => {
     return 'ahora'
   }
 
-  const units = [
-    [Math.floor(minutes / 1440), 'd'],
-    [Math.floor(minutes / 60) % 24, 'h'],
-    [minutes % 60, 'min'],
-  ] as const
-  const first = units.findIndex(([amount]) => amount > 0)
-
-  return `en ${units
-    .slice(first, first + 2)
-    .filter(([amount]) => amount > 0)
-    .map(([amount, unit]) => `${amount} ${unit}`)
-    .join(' ')}`
+  return `en ${spanOf(minutes)}`
 }
 
 /** The session's price as the band and the status line write it. */
@@ -331,7 +392,8 @@ const WIDEST_PERCENT = '100%'.length
 export const rowCellsOf = (shown: Figures, buttons: readonly string[]): number => {
   const sum = (cells: readonly number[]) => cells.reduce((total, one) => total + one, 0)
   const gauges = [shown.context, ...shown.limits].map(
-    gauge => gauge.label.length + WIDEST_PERCENT + 2 * LIMITS.innerGapCells,
+    gauge =>
+      gauge.label.length + WIDEST_PERCENT + (gauge.isStale === true ? 1 : 0) + 2 * LIMITS.innerGapCells,
   )
   const cost = shown.cost === null ? [] : [costTextOf(shown.cost).length]
   const pressed =
@@ -573,6 +635,7 @@ export const reportOf = (
   breakdown: Breakdown | undefined,
   ledger: Ledger,
   nowMs: number,
+  reading?: { stale: readonly string[]; at: number },
 ): string => {
   const { context, cost, rateLimits } = usage
   const figures = [
@@ -585,11 +648,19 @@ export const reportOf = (
         ),
     ...rateLimits.map(limit => {
       const reset = limit.resetsAt === undefined ? null : resetIn(limit.resetsAt, nowMs)
+      // A reading in doubt says so, with its age: the figure may have moved since.
+      const doubt =
+        reading === undefined || !reading.stale.includes(limit.kind)
+          ? null
+          : reading.at > 0
+            ? `dato de ${agoOf(nowMs - reading.at)}`
+            : 'dato sin confirmar'
+      const said = [...(reset === null ? [] : [`se reinicia ${reset}`]), ...(doubt === null ? [] : [doubt])]
 
       return figureRow(
         WINDOW_NAMES[limit.kind] ?? limit.kind,
         limit.percentUsed,
-        reset === null ? null : `se reinicia ${reset}`,
+        said.length === 0 ? null : said.join(' · '),
       )
     }),
     ...(cost === undefined ? [] : [`Precio de la sesión: $${cost.usd.toFixed(2)}`]),

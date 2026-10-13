@@ -1,5 +1,5 @@
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register, Timer, ToolCallInput } from 'claude-code'
+import type { EngineInterface, Register, SessionRateLimit, Timer, ToolCallInput } from 'claude-code'
 
 import {
   COMPACT_INSTRUCTIONS,
@@ -24,6 +24,8 @@ import {
   isWorthAsking,
   ledgerFrom,
   levelFor,
+  percentTextOf,
+  readingFrom,
   reportBlocks,
   reportOf,
   rowCellsOf,
@@ -33,8 +35,7 @@ import {
   topicInstructions,
   topicQuestion,
   windowLabelOf,
-  windowsFrom,
-  windowsShown,
+  windowsNow,
   withoutName,
 } from './advisor'
 import type { AdviceKind, Gauge, Level, Ledger, Signals } from '../types'
@@ -42,9 +43,12 @@ import type { AdviceKind, Gauge, Level, Ledger, Signals } from '../types'
 const QUIET = QUIET_SIGNALS
 const IGNORE_LABEL = 'Ignorar'
 const PLUGIN = 'context-saver'
-// Where the usage windows are kept across sessions, and what this module last wrote there.
+// Where the usage windows are kept across sessions; what this module last kept there and
+// when; and when this process last had them fresh from a response (0, not yet).
 const WINDOWS_KEY = 'windows'
 let savedWindows = ''
+let keptAt = 0
+let ownAt = 0
 const EMPTY = EMPTY_LEDGER
 
 const signals = atom({ plugin: 'context-saver', key: 'signals' } as const, QUIET)
@@ -143,30 +147,48 @@ const startOver = async ($: EngineInterface) => {
 }
 
 /**
+ * The usage windows to show now and which are in doubt. `isFresh` says a response has just
+ * come, so what the engine reports is of this moment: only then is it kept for every session.
+ */
+const readWindows = async ($: EngineInterface, reported: SessionRateLimit[], isFresh: boolean) => {
+  const nowMs = await $.clock.now()
+
+  if (isFresh && reported.length > 0) {
+    ownAt = nowMs
+  }
+
+  const noted = ledgerFrom(await read($, ledger)).windows
+  const stored = readingFrom(await $.store.get(WINDOWS_KEY).catch(() => undefined))
+  // With nothing kept, what this session noted before stands in for it, its time unknown.
+  const kept = stored.windows.length > 0 ? stored : { at: 0, windows: noted }
+  const now = windowsNow({ at: ownAt, windows: reported }, kept, nowMs)
+
+  if (JSON.stringify(now.windows) !== JSON.stringify(noted)) {
+    await update($, ledger, was => ({ ...ledgerFrom(was), windows: now.windows }))
+  }
+
+  // Kept when it changes, and at most once a minute while it does not: other sessions read its time.
+  const isNews = JSON.stringify(now.windows) !== savedWindows || nowMs - keptAt >= LIMITS.refreshMs
+
+  if (isFresh && reported.length > 0 && isNews) {
+    savedWindows = JSON.stringify(now.windows)
+    keptAt = nowMs
+    await $.store.set(WINDOWS_KEY, { at: nowMs, windows: now.windows }).catch(() => undefined)
+  }
+
+  return now
+}
+
+/**
  * Reads the engine's figures: gauges, advice, rate limits. Costs no tokens, so it runs
  * wherever the figures may have moved; state is written only when they did.
  */
-const refresh = async ($: EngineInterface) => {
+const refresh = async ($: EngineInterface, isFresh = false) => {
   const reported = await $.session.usage()
-  const noted = ledgerFrom(await read($, ledger)).windows
-  // The windows are the account's, not this session's. The engine reports them only once a
-  // first response has come: until then they read as any session last saw them.
-  const kept =
-    noted.length > 0 ? noted : windowsFrom(await $.store.get(WINDOWS_KEY).catch(() => undefined))
-  const windows = windowsShown(reported.rateLimits, kept, await $.clock.now())
-
-  if (JSON.stringify(windows) !== JSON.stringify(noted)) {
-    await update($, ledger, now => ({ ...ledgerFrom(now), windows }))
-  }
-
-  if (reported.rateLimits.length > 0 && JSON.stringify(windows) !== savedWindows) {
-    savedWindows = JSON.stringify(windows)
-    await $.store.set(WINDOWS_KEY, windows).catch(() => undefined)
-  }
-
-  const usage = { ...reported, rateLimits: windows }
+  const windows = await readWindows($, reported.rateLimits, isFresh)
+  const usage = { ...reported, rateLimits: windows.windows }
   const percent = usage.context.percent ?? null
-  const shown = figuresOf(usage)
+  const shown = figuresOf(usage, windows.stale)
 
   if (JSON.stringify(await read($, figures)) !== JSON.stringify(shown)) {
     await update($, figures, () => shown)
@@ -330,11 +352,11 @@ export const register: Register = on => {
 
   on('command.run', { command: 'uso' }, async $ => {
     const reported = await $.session.usage({ breakdown: 'summary' })
+    const windows = await readWindows($, reported.rateLimits, false)
     const spent = ledgerFrom(await read($, ledger))
-    const now = await $.clock.now()
-    const usage = { ...reported, rateLimits: windowsShown(reported.rateLimits, spent.windows, now) }
+    const usage = { ...reported, rateLimits: windows.windows }
 
-    return { text: reportOf(usage, reported.context.breakdown, spent, now) }
+    return { text: reportOf(usage, reported.context.breakdown, spent, await $.clock.now(), windows) }
   })
 
   on('prompt.submit', async ($, e, next) => {
@@ -372,7 +394,7 @@ export const register: Register = on => {
     }
 
     await noteBigOutput($, e, ran.text ?? '')
-    await refresh($)
+    await refresh($, true)
 
     return ran
   })
@@ -388,7 +410,7 @@ export const register: Register = on => {
       return done
     }
 
-    await refresh($)
+    await refresh($, true)
     startPauseTimers($)
 
     return done
@@ -435,8 +457,10 @@ export const register: Register = on => {
     // in bold; at the danger level the whole gauge takes the colour.
     const gauge = (one: Gauge) => {
       const used = filledCells(one.percent, cells)
-      const color = LEVEL_COLORS[one.level]
-      const isDanger = one.level === 'danger'
+      // A reading in doubt loses its colour: muted, and its percentage written as approximate.
+      const isStale = one.isStale === true
+      const color = isStale ? MUTED : LEVEL_COLORS[one.level]
+      const isDanger = !isStale && one.level === 'danger'
 
       return (
         <Box columnGap={LIMITS.innerGapCells} alignItems="center" flexShrink={0}>
@@ -449,12 +473,14 @@ export const register: Register = on => {
           ) : (
             <Svg
               source={barSvg(one.percent, color, TRACK, cells * LIMITS.cellPx, LIMITS.barHeightPx)}
-              alt={`${one.percent}%`}
+              alt={percentTextOf(one)}
               width={cells * LIMITS.cellPx}
               height={LIMITS.barHeightPx}
             />
           )}
-          <Text bold {...(isDanger ? { color } : {})}>{`${one.percent}%`}</Text>
+          <Text bold {...(isDanger || isStale ? { color } : {})}>
+            {percentTextOf(one)}
+          </Text>
         </Box>
       )
     }

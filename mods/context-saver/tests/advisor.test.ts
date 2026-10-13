@@ -3,6 +3,7 @@ import { describe, expect, test } from 'claude-code/testing'
 import {
   adviceFor,
   agentNoted,
+  agoOf,
   barCellsFor,
   barSvg,
   commandFor,
@@ -13,6 +14,7 @@ import {
   isWorthAsking,
   ledgerFrom,
   levelFor,
+  readingFrom,
   reportBlocks,
   reportOf,
   rowCellsOf,
@@ -24,6 +26,7 @@ import {
   topicInstructions,
   topicQuestion,
   windowsFrom,
+  windowsNow,
   windowsShown,
   withoutName,
 } from '../hooks/advisor'
@@ -196,6 +199,129 @@ describe('windowsFrom', () => {
     ])
     expect(windowsFrom(undefined)).toEqual([])
     expect(windowsFrom({ kind: 'five_hour', percentUsed: 42 })).toEqual([])
+  })
+})
+
+describe('readingFrom', () => {
+  test('reads a kept reading with its time, and a bare list, as 0.13.2 kept it, as one with no time', () => {
+    const windows = [{ kind: 'five_hour', percentUsed: 42 }]
+
+    expect(readingFrom({ at: 5000, windows })).toEqual({ at: 5000, windows })
+    expect(readingFrom(windows)).toEqual({ at: 0, windows })
+    expect(readingFrom(undefined)).toEqual({ at: 0, windows: [] })
+    expect(readingFrom({ at: 'x', windows: 'y' })).toEqual({ at: 0, windows: [] })
+  })
+})
+
+describe('windowsNow', () => {
+  const HOUR = 60 * 60_000
+  const AT = 10 * HOUR
+  const later = new Date(AT + 2 * HOUR).toISOString()
+  const five = (percentUsed: number, resetsAt = later) => ({ kind: 'five_hour', percentUsed, resetsAt })
+  const seven = (percentUsed: number) => ({
+    kind: 'seven_day',
+    percentUsed,
+    resetsAt: new Date(AT + 100 * HOUR).toISOString(),
+  })
+  const shown = (now: { windows: { kind: string; percentUsed: number }[] }) =>
+    now.windows.map(one => [one.kind, one.percentUsed])
+
+  test("shows the engine's own reading while it is the newest, with nothing in doubt", () => {
+    const now = windowsNow(
+      { at: AT - 60_000, windows: [five(50), seven(10)] },
+      { at: AT - HOUR, windows: [five(42), seven(9)] },
+      AT,
+    )
+
+    expect(shown(now)).toEqual([
+      ['five_hour', 50],
+      ['seven_day', 10],
+    ])
+    expect(now.stale).toEqual([])
+    expect(now.at).toBe(AT - 60_000)
+  })
+
+  test('shows what any session last kept until the engine reports, in doubt only once it is old', () => {
+    const none = { at: 0, windows: [] }
+    const recent = windowsNow(none, { at: AT - 5 * 60_000, windows: [five(42), seven(9)] }, AT)
+    const old = windowsNow(none, { at: AT - 2 * HOUR, windows: [five(42), seven(9)] }, AT)
+
+    expect(shown(recent)).toEqual([
+      ['five_hour', 42],
+      ['seven_day', 9],
+    ])
+    expect(recent.stale).toEqual([])
+    expect(shown(old)).toEqual(shown(recent))
+    expect(old.stale).toEqual(['five_hour', 'seven_day'])
+  })
+
+  test('takes a reading another session kept after this one', () => {
+    const now = windowsNow({ at: AT - 20 * 60_000, windows: [five(50)] }, { at: AT - 60_000, windows: [five(60)] }, AT)
+
+    expect(shown(now)).toEqual([['five_hour', 60]])
+    expect(now.stale).toEqual([])
+  })
+
+  test('reads a kept window past its reset as 0%, in doubt: that 0% is assumed, not read', () => {
+    const past = new Date(AT - HOUR).toISOString()
+    const now = windowsNow({ at: 0, windows: [] }, { at: AT - 60_000, windows: [five(42, past), seven(9)] }, AT)
+
+    expect(shown(now)).toEqual([
+      ['five_hour', 0],
+      ['seven_day', 9],
+    ])
+    expect(now.stale).toEqual(['five_hour'])
+  })
+
+  test('keeps a window the engine has stopped reporting, from what was kept', () => {
+    const now = windowsNow(
+      { at: AT - 60_000, windows: [seven(10)] },
+      { at: AT - 2 * HOUR, windows: [five(42), seven(9)] },
+      AT,
+    )
+
+    expect(shown(now)).toEqual([
+      ['five_hour', 42],
+      ['seven_day', 10],
+    ])
+    expect(now.stale).toEqual(['five_hour'])
+  })
+})
+
+describe('agoOf', () => {
+  test('says how long ago in its two largest units', () => {
+    expect(agoOf(20_000)).toBe('recién')
+    expect(agoOf(3 * 60_000)).toBe('hace 3 min')
+    expect(agoOf(125 * 60_000)).toBe('hace 2 h 5 min')
+  })
+})
+
+describe('a reading in doubt', () => {
+  test('marks its gauges, and writes their percentage as approximate', () => {
+    const figures = figuresOf(
+      {
+        startedAt: 0,
+        context: { window: 200_000, percent: 42, tokens: 84_000 },
+        rateLimits: [
+          { kind: 'five_hour', percentUsed: 30 },
+          { kind: 'seven_day', percentUsed: 12 },
+        ],
+      },
+      ['five_hour'],
+    )
+
+    if (figures === null) {
+      throw new Error('no figures')
+    }
+
+    expect(figures.limits).toEqual([
+      { label: '5h', percent: 30, level: 'ok', isStale: true },
+      { label: '7d', percent: 12, level: 'ok' },
+    ])
+    expect(statusTextOf(figures)).toBe('Contexto 42% · 5h ~30% · 7d 12%')
+
+    const sure = { ...figures, limits: figures.limits.map(({ label, percent, level }) => ({ label, percent, level })) }
+    expect(rowCellsOf(figures, []), 'one cell more for the mark').toBe(rowCellsOf(sure, []) + 1)
   })
 })
 
@@ -571,6 +697,17 @@ describe('reportOf', () => {
 
     expect(lines.filter(line => line.startsWith('• Explore |')).length).toBe(6)
     expect(lines.at(-1)).toBe('y 2 más: 3k tokens')
+  })
+
+  test('says how old a reading in doubt is, on the line of its window', () => {
+    const kind = usage.rateLimits[0]?.kind ?? ''
+    const old = reportOf(usage, breakdown, QUIET, NOW, { stale: [kind], at: NOW - 2 * 60 * 60_000 })
+    const unknown = reportOf(usage, breakdown, QUIET, NOW, { stale: [kind], at: 0 })
+
+    expect(old.split('\n')[1]).toContain(' · dato de hace 2 h')
+    expect(old.split('\n')[2], 'only the window in doubt').not.toContain('dato de')
+    expect(unknown.split('\n')[1]).toContain(' · dato sin confirmar')
+    expect(reportOf(usage, breakdown, QUIET, NOW)).not.toContain('dato')
   })
 
   test('says so in one line when the engine has no reading yet', () => {

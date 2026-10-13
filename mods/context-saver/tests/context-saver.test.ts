@@ -675,15 +675,18 @@ test('keeps a usage window on screen at 0% after the engine stops reporting it',
   world.usage = usageAt(20)
   await world.clock.advance(3 * 60_000)
   await endTurn($)
-  expect(await texts(), 'still there, reset to zero').toEqual(expect.arrayContaining(['5h', '0%']))
+  expect(await texts(), 'still there, reset to zero').toEqual(expect.arrayContaining(['5h', '~0%']))
 })
 
 test('shows the usage windows from the first moment, as any session last saw them', async ($, on) => {
   const world = worldOf(on, 20)
-  world.store.windows = [
-    { kind: 'five_hour', percentUsed: 42, resetsAt: new Date(60 * 60_000).toISOString() },
-    { kind: 'seven_day', percentUsed: 9 },
-  ]
+  world.store.windows = {
+    at: 0,
+    windows: [
+      { kind: 'five_hour', percentUsed: 42, resetsAt: new Date(60 * 60_000).toISOString() },
+      { kind: 'seven_day', percentUsed: 9 },
+    ],
+  }
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
   const texts = async () => (await ui.findAll({ type: 'Text' })).map(one => one.text)
 
@@ -703,7 +706,10 @@ test('shows the usage windows from the first moment, as any session last saw the
   expect(await texts(), "the engine's own reading takes their place").toEqual(
     expect.arrayContaining(['5h', '50%', '7d', '10%']),
   )
-  expect(world.store.windows, 'and is kept for the next session').toEqual(world.usage.rateLimits)
+  expect(world.store.windows, 'and is kept, with its time, for every session').toEqual({
+    at: 0,
+    windows: world.usage.rateLimits,
+  })
 
   await endTurn($)
   expect(world.stored, 'kept once while it stays the same').toBe(1)
@@ -711,13 +717,55 @@ test('shows the usage windows from the first moment, as any session last saw the
 
 test('a window kept from before reads 0% once its reset time has passed', async ($, on) => {
   const world = worldOf(on, 20)
-  world.store.windows = [{ kind: 'five_hour', percentUsed: 42, resetsAt: new Date(60_000).toISOString() }]
+  world.store.windows = {
+    at: 0,
+    windows: [{ kind: 'five_hour', percentUsed: 42, resetsAt: new Date(60_000).toISOString() }],
+  }
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
 
   await world.clock.advance(2 * 60_000)
   await $.session.start({ cwd: 'C:/p', surface: 'terminal', isInteractive: true })
 
-  expect((await ui.findAll({ type: 'Text' })).map(one => one.text)).toEqual(expect.arrayContaining(['5h', '0%']))
+  expect((await ui.findAll({ type: 'Text' })).map(one => one.text)).toEqual(expect.arrayContaining(['5h', '~0%']))
+})
+
+test('marks an old reading as approximate instead of passing it off as current', async ($, on) => {
+  const world = worldOf(on, 20)
+  world.store.windows = {
+    at: 0,
+    windows: [{ kind: 'five_hour', percentUsed: 42, resetsAt: new Date(5 * HOUR).toISOString() }],
+  }
+  const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
+  const percent = async (text: RegExp) => (await ui.find({ type: 'Text', text }))?.props
+
+  await world.clock.advance(2 * HOUR)
+  await $.session.start({ cwd: 'C:/p', surface: 'terminal', isInteractive: true })
+  expect(await percent(/^~42%$/), 'two hours old').toMatchObject({ color: '#9ca3af' })
+  expect(String((await ui.findAll({ type: 'Svg' }))[1]?.props.source), 'its bar loses its colour').not.toContain(
+    '#4ade80',
+  )
+
+  world.usage = { ...usageAt(20), rateLimits: [{ kind: 'five_hour', percentUsed: 50 }] }
+  await endTurn($)
+  expect(await percent(/^50%$/), "the engine's reading, as it is").toBeDefined()
+  expect(await percent(/^~/)).toBe(undefined)
+})
+
+test('takes a newer reading another session kept, without waiting for a response', async ($, on) => {
+  const world = worldOf(on, 20)
+  world.usage = { ...usageAt(20), rateLimits: [{ kind: 'five_hour', percentUsed: 50 }] }
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  const texts = async () => (await ui.findAll({ type: 'Text' })).map(one => one.text)
+
+  await $.session.start({ cwd: 'C:/p', surface: 'terminal', isInteractive: true })
+  await endTurn($)
+  expect(await texts()).toContain('50%')
+
+  // Another session gets a response later and keeps what it read; this one re-reads each minute.
+  await world.clock.advance(30_000)
+  world.store.windows = { at: 30_000, windows: [{ kind: 'five_hour', percentUsed: 60 }] }
+  await world.clock.advance(60_000)
+  expect(await texts()).toContain('60%')
 })
 
 test('announces a rate-limit window near its cap once', async ($, on) => {
