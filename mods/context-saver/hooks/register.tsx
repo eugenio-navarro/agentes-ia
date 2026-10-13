@@ -1,5 +1,12 @@
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register, SessionRateLimit, Timer, ToolCallInput } from 'claude-code'
+import type {
+  EngineInterface,
+  Register,
+  SessionRateLimit,
+  SessionUsage,
+  Timer,
+  ToolCallInput,
+} from 'claude-code'
 
 import {
   COMPACT_INSTRUCTIONS,
@@ -14,6 +21,9 @@ import {
   clipPrompt,
   baseName,
   commandFor,
+  costNoteFrom,
+  costNoted,
+  costTotalOf,
   costTextOf,
   cutOf,
   estimateTokens,
@@ -38,6 +48,7 @@ import {
   windowsNow,
   withoutName,
 } from './advisor'
+import type { CostNote } from './advisor'
 import type { AdviceKind, Gauge, Level, Ledger, Signals } from '../types'
 
 const QUIET = QUIET_SIGNALS
@@ -49,6 +60,13 @@ const WINDOWS_KEY = 'windows'
 let savedWindows = ''
 let keptAt = 0
 let ownAt = 0
+// The session's price is kept under a key of its own, so one session's writes never undo
+// another's: the key and note this module holds, what it last wrote, and when (null, never).
+const COST_PREFIX = 'cost:'
+let costKey: string | null = null
+let costNote: CostNote | null = null
+let costKept = ''
+let costKeptAt: number | null = null
 const EMPTY = EMPTY_LEDGER
 
 const signals = atom({ plugin: 'context-saver', key: 'signals' } as const, QUIET)
@@ -147,6 +165,53 @@ const startOver = async ($: EngineInterface) => {
 }
 
 /**
+ * The engine's figures with the price of the whole session. The engine counts from when its
+ * process started, so after a restart it reads from zero: what earlier runs reached is kept
+ * across sessions and added back.
+ */
+const withWholeCost = async <Usage extends SessionUsage>($: EngineInterface, reported: Usage): Promise<Usage> => {
+  if (reported.cost === undefined) {
+    return reported
+  }
+
+  const nowMs = await $.clock.now()
+  const key = `${COST_PREFIX}${await $.session.id()}`
+
+  // The first reading, or a /clear gave the session another id.
+  if (key !== costKey) {
+    costKey = key
+    costNote = costNoteFrom(await $.store.get(key).catch(() => undefined))
+    costKept = costNote === null ? '' : `${costNote.base}:${costNote.last}`
+  }
+
+  const note = costNoted(costNote, reported.cost.usd, nowMs)
+  const text = `${note.base}:${note.last}`
+  costNote = note
+
+  if (text !== costKept && (costKeptAt === null || nowMs - costKeptAt >= LIMITS.costKeepMs)) {
+    costKept = text
+    costKeptAt = nowMs
+    await $.store.set(key, note).catch(() => undefined)
+  }
+
+  return { ...reported, cost: { ...reported.cost, usd: costTotalOf(note) } }
+}
+
+/** Forgets the price of sessions not seen for a long time, so what is kept does not grow for ever. */
+const forgetOldCosts = async ($: EngineInterface) => {
+  const nowMs = await $.clock.now()
+  const keys = (await $.store.keys().catch(() => [])).filter(key => key.startsWith(COST_PREFIX))
+
+  for (const key of keys) {
+    const note = costNoteFrom(await $.store.get(key).catch(() => undefined))
+
+    if (key !== costKey && (note === null || nowMs - note.at > LIMITS.costForgetMs)) {
+      await $.store.delete(key).catch(() => undefined)
+    }
+  }
+}
+
+/**
  * The usage windows to show now and which are in doubt. `isFresh` says a response has just
  * come, so what the engine reports is of this moment: only then is it kept for every session.
  */
@@ -184,7 +249,7 @@ const readWindows = async ($: EngineInterface, reported: SessionRateLimit[], isF
  * wherever the figures may have moved; state is written only when they did.
  */
 const refresh = async ($: EngineInterface, isFresh = false) => {
-  const reported = await $.session.usage()
+  const reported = await withWholeCost($, await $.session.usage())
   const windows = await readWindows($, reported.rateLimits, isFresh)
   const usage = { ...reported, rateLimits: windows.windows }
   const percent = usage.context.percent ?? null
@@ -342,6 +407,7 @@ export const register: Register = on => {
       description: 'Uso del contexto y de tus límites, y qué ocupa lugar en esta conversación.',
     })
     await refresh($)
+    await forgetOldCosts($)
     refreshTimer?.cancel()
     refreshTimer = $.clock.every(LIMITS.refreshMs, () => {
       void refresh($)
@@ -351,7 +417,7 @@ export const register: Register = on => {
   })
 
   on('command.run', { command: 'uso' }, async $ => {
-    const reported = await $.session.usage({ breakdown: 'summary' })
+    const reported = await withWholeCost($, await $.session.usage({ breakdown: 'summary' }))
     const windows = await readWindows($, reported.rateLimits, false)
     const spent = ledgerFrom(await read($, ledger))
     const usage = { ...reported, rateLimits: windows.windows }

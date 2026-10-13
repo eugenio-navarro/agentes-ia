@@ -33,6 +33,9 @@ export const LIMITS = {
   refreshMs: 60_000,
   /** How long a reading of the usage windows passes for current; older, it is drawn as approximate. */
   freshMs: 30 * 60_000,
+  /** The least between two writes of a session's price, and how long one unseen is remembered. */
+  costKeepMs: 15_000,
+  costForgetMs: 30 * 24 * 60 * 60_000,
   /** A bar's length in cells: no shorter than reads as a bar, no longer than looks like one. */
   barMinCells: 7,
   barMaxCells: 16,
@@ -379,6 +382,40 @@ export const resetIn = (iso: string, nowMs: number): string | null => {
 
   return `en ${spanOf(minutes)}`
 }
+
+/**
+ * A session's price across restarts of its process, in millionths of a dollar so it adds up
+ * exactly: what earlier runs reached, what this run last reported, and when it was noted.
+ */
+export type CostNote = { base: number; last: number; at: number }
+
+/** The note kept across sessions: the stored value when it is one, null when it is not. */
+export const costNoteFrom = (stored: unknown): CostNote | null => {
+  if (typeof stored !== 'object' || stored === null) {
+    return null
+  }
+
+  const { base, last, at } = stored as Record<string, unknown>
+
+  return typeof base === 'number' && typeof last === 'number' && typeof at === 'number'
+    ? { base, last, at }
+    : null
+}
+
+/**
+ * The note after the engine reports `usd`. Its counter starts over when the process restarts,
+ * which reads as a fall: what it had reached is then carried over, so the price shown is the
+ * whole session's and not only this run's.
+ */
+export const costNoted = (note: CostNote | null, usd: number, nowMs: number): CostNote => {
+  const last = Math.round(usd * 1_000_000)
+  const was = note ?? { base: 0, last: 0 }
+
+  return { base: last < was.last ? was.base + was.last : was.base, last, at: nowMs }
+}
+
+/** The session's whole price, in dollars. */
+export const costTotalOf = (note: CostNote): number => (note.base + note.last) / 1_000_000
 
 /** The session's price as the band and the status line write it. */
 export const costTextOf = (cost: string): string => `Precio: ${cost}`

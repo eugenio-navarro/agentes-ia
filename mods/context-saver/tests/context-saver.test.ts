@@ -80,10 +80,17 @@ const worldOf = (on: On, percent: number | undefined): World => {
   on('store.get', ($, e) => ({ value: world.store[e.key] }))
   on('store.set', ($, e) => {
     world.store[e.key] = e.value
-    world.stored += 1
+    world.stored += e.key === 'windows' ? 1 : 0
 
     return { value: undefined }
   })
+  on('store.keys', () => ({ value: Object.keys(world.store) }))
+  on('store.delete', ($, e) => {
+    delete world.store[e.key]
+
+    return { value: undefined }
+  })
+  on('session.id', () => ({ value: 's1' }))
   on('agent.list', () => ({ value: world.agents.map(one => ({ ...one, status: 'running' })) as never }))
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('session.end', ($, e) => ({ sessionId: e.sessionId }) as never)
@@ -766,6 +773,37 @@ test('takes a newer reading another session kept, without waiting for a response
   world.store.windows = { at: 30_000, windows: [{ kind: 'five_hour', percentUsed: 60 }] }
   await world.clock.advance(60_000)
   expect(await texts()).toContain('60%')
+})
+
+test('shows the whole price of the session after its process restarts, not only this run', async ($, on) => {
+  const world = worldOf(on, 20)
+  const DAY = 24 * HOUR
+  // What the earlier run reached; the counter of the new one starts over.
+  world.store['cost:s1'] = { base: 0, last: 45_150_000, at: 0 }
+  world.store['cost:long-gone'] = { base: 0, last: 9_000_000, at: 0 }
+  world.usage = { ...usageAt(20), cost: { usd: 0 } }
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  const texts = async () => (await ui.findAll({ type: 'Text' })).map(one => one.text)
+
+  await world.clock.advance(40 * DAY)
+  await $.session.start({ cwd: 'C:/p', surface: 'terminal', isInteractive: true })
+  expect(await texts(), 'as it was when the app closed').toContain('Precio: $45.15')
+  expect(Object.keys(world.store), 'a session not seen in a month is forgotten').not.toContain('cost:long-gone')
+
+  world.usage = { ...usageAt(20), cost: { usd: 4.14 } }
+  await endTurn($)
+  expect(await texts()).toContain('Precio: $49.29')
+
+  const ran = await $.command.run({
+    command: 'uso',
+    args: '',
+    origin: { kind: 'composer' },
+    presentation: { isFullscreen: false, columns: 80 },
+  })
+  expect(ran.text).toContain('Precio de la sesión: $49.29')
+
+  await world.clock.advance(60_000)
+  expect(world.store['cost:s1'], 'kept for the next restart').toMatchObject({ base: 45_150_000, last: 4_140_000 })
 })
 
 test('announces a rate-limit window near its cap once', async ($, on) => {

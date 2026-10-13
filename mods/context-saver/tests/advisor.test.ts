@@ -7,6 +7,9 @@ import {
   barCellsFor,
   barSvg,
   commandFor,
+  costNoteFrom,
+  costNoted,
+  costTotalOf,
   cutOf,
   estimateTokens,
   figuresOf,
@@ -322,6 +325,29 @@ describe('a reading in doubt', () => {
 
     const sure = { ...figures, limits: figures.limits.map(({ label, percent, level }) => ({ label, percent, level })) }
     expect(rowCellsOf(figures, []), 'one cell more for the mark').toBe(rowCellsOf(sure, []) + 1)
+  })
+})
+
+describe('costNoted', () => {
+  test('follows the engine while its counter only grows', () => {
+    const first = costNoted(null, 1.5, 1000)
+
+    expect(first).toEqual({ base: 0, last: 1_500_000, at: 1000 })
+    expect(costTotalOf(costNoted(first, 2.25, 2000))).toBe(2.25)
+  })
+
+  test('carries over what an earlier run reached when the counter starts over', () => {
+    const before = costNoted(null, 45.15, 1000)
+    const restarted = costNoted(before, 0, 2000)
+
+    expect(restarted).toEqual({ base: 45_150_000, last: 0, at: 2000 })
+    expect(costTotalOf(costNoted(restarted, 4.14, 3000))).toBe(49.29)
+  })
+
+  test('reads back what was kept, and nothing from what is not a note', () => {
+    expect(costNoteFrom({ base: 1, last: 2, at: 3 })).toEqual({ base: 1, last: 2, at: 3 })
+    expect(costNoteFrom({ base: '1', last: 2, at: 3 })).toBe(null)
+    expect(costNoteFrom(undefined)).toBe(null)
   })
 })
 
