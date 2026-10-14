@@ -41,7 +41,7 @@ export type Ledger = {
 export type Level = 'ok' | 'warn' | 'danger'
 
 /** One percentage of the band: its label, whole percent and level. */
-/** `isStale` marks a figure in doubt: its reading is old or assumed, so it is drawn as approximate. */
+/** `isStale` marks a figure in doubt: its reading is old or assumed, so a dash is drawn in its place. */
 export type Gauge = { label: string; percent: number; level: Level; isStale?: true }
 
 /** What the band draws: context, rate-limit windows, cost. */

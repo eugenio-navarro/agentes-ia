@@ -593,6 +593,7 @@ test("draws the /uso report in the transcript with the band's bars, a title per 
   const text = [
     'context-saver: Contexto  ██████████░░░░░░░░░░  48% · 476k de 1M tokens',
     '7 días    █████████████████░░░  85%',
+    '5 horas   ░░░░░░░░░░░░░░░░░░░░    – · sin dato actual',
     'Precio de la sesión: $16.45',
     '',
     'Qué ocupa el contexto',
@@ -624,13 +625,16 @@ test("draws the /uso report in the transcript with the band's bars, a title per 
     )
     expect(labelOf('Conectores más pesados')).toMatchObject({ color: '#9ca3af' })
     expect(texts.map(one => one.text)).toContain('browser 11k')
+    expect(texts.map(one => one.text), 'a window with no current reading').toEqual(
+      expect.arrayContaining(['5 horas', '–', 'sin dato actual']),
+    )
     expect(labelOf('Explore'), 'an agent reads as the rows above it').toMatchObject({ color: '#9ca3af' })
     expect(texts.map(one => one.text)).toContain('buscar usos')
     expect(texts.map(one => one.text), 'the first label, without the name').toContain('Contexto')
     expect(texts.some(one => String(one.text).includes('context-saver'))).toBe(false)
 
     const bars = (await ui.findAll({ type: 'Svg' })).map(one => String(one.props.source))
-    expect(bars.length, 'vector bars only where the surface draws them').toBe(surface === 'terminal' ? 0 : 3)
+    expect(bars.length, 'vector bars only where the surface draws them').toBe(surface === 'terminal' ? 0 : 4)
 
     if (surface !== 'terminal') {
       expect(bars[0], 'context at 48%').toContain('#4ade80')
@@ -682,7 +686,7 @@ test('keeps a usage window on screen at 0% after the engine stops reporting it',
   world.usage = usageAt(20)
   await world.clock.advance(3 * 60_000)
   await endTurn($)
-  expect(await texts(), 'still there, reset to zero').toEqual(expect.arrayContaining(['5h', '~0%']))
+  expect(await texts(), 'still there, reset to zero').toEqual(expect.arrayContaining(['5h', '–']))
 })
 
 test('shows the usage windows from the first moment, as any session last saw them', async ($, on) => {
@@ -733,10 +737,10 @@ test('a window kept from before reads 0% once its reset time has passed', async 
   await world.clock.advance(2 * 60_000)
   await $.session.start({ cwd: 'C:/p', surface: 'terminal', isInteractive: true })
 
-  expect((await ui.findAll({ type: 'Text' })).map(one => one.text)).toEqual(expect.arrayContaining(['5h', '~0%']))
+  expect((await ui.findAll({ type: 'Text' })).map(one => one.text)).toEqual(expect.arrayContaining(['5h', '–']))
 })
 
-test('marks an old reading as approximate instead of passing it off as current', async ($, on) => {
+test('shows a dash for an old reading instead of passing it off as current', async ($, on) => {
   const world = worldOf(on, 20)
   world.store.windows = {
     at: 0,
@@ -747,15 +751,16 @@ test('marks an old reading as approximate instead of passing it off as current',
 
   await world.clock.advance(2 * HOUR)
   await $.session.start({ cwd: 'C:/p', surface: 'terminal', isInteractive: true })
-  expect(await percent(/^~42%$/), 'two hours old').toMatchObject({ color: '#9ca3af' })
-  expect(String((await ui.findAll({ type: 'Svg' }))[1]?.props.source), 'its bar loses its colour').not.toContain(
-    '#4ade80',
+  expect(await percent(/^–$/), 'two hours old: no figure').toMatchObject({ color: '#9ca3af' })
+  expect(String((await ui.findAll({ type: 'Svg' }))[1]?.props.source), 'and an empty bar').not.toMatch(
+    /#4ade80|#9ca3af/,
   )
+  expect(await percent(/42%/), 'the old figure is not shown at all').toBe(undefined)
 
   world.usage = { ...usageAt(20), rateLimits: [{ kind: 'five_hour', percentUsed: 50 }] }
   await endTurn($)
   expect(await percent(/^50%$/), "the engine's reading, as it is").toBeDefined()
-  expect(await percent(/^~/)).toBe(undefined)
+  expect(await percent(/^–$/)).toBe(undefined)
 })
 
 test('takes a newer reading another session kept, without waiting for a response', async ($, on) => {

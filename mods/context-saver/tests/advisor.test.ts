@@ -300,7 +300,7 @@ describe('agoOf', () => {
 })
 
 describe('a reading in doubt', () => {
-  test('marks its gauges, and writes their percentage as approximate', () => {
+  test('marks its gauges, and writes a dash where their percentage would be', () => {
     const figures = figuresOf(
       {
         startedAt: 0,
@@ -321,10 +321,10 @@ describe('a reading in doubt', () => {
       { label: '5h', percent: 30, level: 'ok', isStale: true },
       { label: '7d', percent: 12, level: 'ok' },
     ])
-    expect(statusTextOf(figures)).toBe('Contexto 42% · 5h ~30% · 7d 12%')
+    expect(statusTextOf(figures)).toBe('Contexto 42% · 5h – · 7d 12%')
 
     const sure = { ...figures, limits: figures.limits.map(({ label, percent, level }) => ({ label, percent, level })) }
-    expect(rowCellsOf(figures, []), 'one cell more for the mark').toBe(rowCellsOf(sure, []) + 1)
+    expect(rowCellsOf(figures, []), 'the dash takes no more room than a figure').toBe(rowCellsOf(sure, []))
   })
 })
 
@@ -400,6 +400,14 @@ describe('reportBlocks', () => {
       { kind: 'share', label: 'Instrucciones y memoria', amount: '10k', percent: 2 },
       { kind: 'title', text: 'Detalle del gasto' },
       { kind: 'detail', label: 'Conectores más pesados', value: 'browser 11k · gmail 1k' },
+    ])
+  })
+
+  test('reads a window with no current reading as a figure without a percentage', () => {
+    const line = '5 horas   ░░░░░░░░░░░░░░░░░░░░    – · sin dato actual, último 63% hace 2 h'
+
+    expect(reportBlocks(line)).toEqual([
+      { kind: 'figure', label: '5 horas', percent: null, detail: 'sin dato actual, último 63% hace 2 h' },
     ])
   })
 
@@ -725,15 +733,16 @@ describe('reportOf', () => {
     expect(lines.at(-1)).toBe('y 2 más: 3k tokens')
   })
 
-  test('says how old a reading in doubt is, on the line of its window', () => {
+  test('writes a window in doubt with no figure: an empty bar, a dash and what was last read', () => {
     const kind = usage.rateLimits[0]?.kind ?? ''
     const old = reportOf(usage, breakdown, QUIET, NOW, { stale: [kind], at: NOW - 2 * 60 * 60_000 })
     const unknown = reportOf(usage, breakdown, QUIET, NOW, { stale: [kind], at: 0 })
 
-    expect(old.split('\n')[1]).toContain(' · dato de hace 2 h')
-    expect(old.split('\n')[2], 'only the window in doubt').not.toContain('dato de')
-    expect(unknown.split('\n')[1]).toContain(' · dato sin confirmar')
-    expect(reportOf(usage, breakdown, QUIET, NOW)).not.toContain('dato')
+    expect(old.split('\n')[1]).toMatch(/░{20}\s+– · .*sin dato actual, último \d+% hace 2 h$/)
+    expect(old.split('\n')[1], 'no bar, no percentage').not.toMatch(/█|\d+%\s·/)
+    expect(old.split('\n')[2], 'only the window in doubt').not.toContain('sin dato')
+    expect(unknown.split('\n')[1]).toMatch(/– · .*sin dato actual$/)
+    expect(reportOf(usage, breakdown, QUIET, NOW)).not.toContain('sin dato')
   })
 
   test('says so in one line when the engine has no reading yet', () => {

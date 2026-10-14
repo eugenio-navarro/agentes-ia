@@ -333,8 +333,11 @@ export const figuresOf = (
   }
 }
 
-/** A gauge's percentage as written: one in doubt is marked approximate. */
-export const percentTextOf = (gauge: Gauge): string => `${gauge.isStale === true ? '~' : ''}${gauge.percent}%`
+/** What is written where a figure is not known: never a number that only may be right. */
+export const UNKNOWN = '–'
+
+/** A gauge's percentage as written: a dash for one in doubt. */
+export const percentTextOf = (gauge: Gauge): string => (gauge.isStale === true ? UNKNOWN : `${gauge.percent}%`)
 
 /** The figures as one plain line, for a surface that draws no band. */
 export const statusTextOf = (figures: Figures | null): string | undefined =>
@@ -429,8 +432,7 @@ const WIDEST_PERCENT = '100%'.length
 export const rowCellsOf = (shown: Figures, buttons: readonly string[]): number => {
   const sum = (cells: readonly number[]) => cells.reduce((total, one) => total + one, 0)
   const gauges = [shown.context, ...shown.limits].map(
-    gauge =>
-      gauge.label.length + WIDEST_PERCENT + (gauge.isStale === true ? 1 : 0) + 2 * LIMITS.innerGapCells,
+    gauge => gauge.label.length + WIDEST_PERCENT + 2 * LIMITS.innerGapCells,
   )
   const cost = shown.cost === null ? [] : [costTextOf(shown.cost).length]
   const pressed =
@@ -506,10 +508,10 @@ const GROUPS: readonly (readonly [string, readonly string[]])[] = [
 ]
 
 /** One figure of the report: its name, a bar, the percentage and what else is worth saying. */
-const figureRow = (name: string, percent: number, detail: string | null): string => {
-  const used = filledCells(percent, REPORT_BAR_CELLS)
+const figureRow = (name: string, percent: number | null, detail: string | null): string => {
+  const used = percent === null ? 0 : filledCells(percent, REPORT_BAR_CELLS)
   const bar = '█'.repeat(used) + '░'.repeat(REPORT_BAR_CELLS - used)
-  const shown = `${Math.round(percent)}%`.padStart(4)
+  const shown = (percent === null ? UNKNOWN : `${Math.round(percent)}%`).padStart(4)
 
   return `${name.padEnd(REPORT_LABEL_WIDTH)}${bar} ${shown}${detail === null ? '' : ` · ${detail}`}`
 }
@@ -597,7 +599,7 @@ export const withoutName = (text: string, plugin: string): string =>
 
 /** One line of the /uso report, as the transcript draws it. */
 export type ReportBlock =
-  | { kind: 'figure'; label: string; percent: number; detail: string | null }
+  | { kind: 'figure'; label: string; percent: number | null; detail: string | null }
   | { kind: 'share'; label: string; percent: number; amount: string }
   | { kind: 'fact'; label: string; value: string }
   | { kind: 'detail'; label: string; value: string }
@@ -606,6 +608,7 @@ export type ReportBlock =
   | { kind: 'note'; text: string }
 
 const FIGURE_LINE = /^(.+?)\s+[█░]+\s+(\d+)%(?: · (.*))?$/
+const UNKNOWN_LINE = /^(.+?)\s+░+\s+–(?: · (.*))?$/
 const SHARE_LINE = /^• (.+): (\S+) \((\d+)%\)$/
 const AGENT_LINE = /^• (.+?) \| (.*) \| (.+)$/
 const DETAIL_LINE = /^• ([^:]+): (.+)$/
@@ -630,6 +633,12 @@ export const reportBlocks = (text: string): ReportBlock[] =>
           percent: Number(figure[2]),
           detail: figure[3] ?? null,
         }
+      }
+
+      const unknown = UNKNOWN_LINE.exec(line)
+
+      if (unknown !== null) {
+        return { kind: 'figure', label: (unknown[1] ?? '').trim(), percent: null, detail: unknown[2] ?? null }
       }
 
       const agent = AGENT_LINE.exec(line)
@@ -685,18 +694,19 @@ export const reportOf = (
         ),
     ...rateLimits.map(limit => {
       const reset = limit.resetsAt === undefined ? null : resetIn(limit.resetsAt, nowMs)
-      // A reading in doubt says so, with its age: the figure may have moved since.
-      const doubt =
-        reading === undefined || !reading.stale.includes(limit.kind)
-          ? null
-          : reading.at > 0
-            ? `dato de ${agoOf(nowMs - reading.at)}`
-            : 'dato sin confirmar'
+      const isInDoubt = reading !== undefined && reading.stale.includes(limit.kind)
+      // A window in doubt is written with no figure. What was last read is said beside it,
+      // with its age, unless it is the 0% assumed after a reset.
+      const doubt = !isInDoubt
+        ? null
+        : reading.at > 0 && limit.percentUsed > 0
+          ? `sin dato actual, último ${Math.round(limit.percentUsed)}% ${agoOf(nowMs - reading.at)}`
+          : 'sin dato actual'
       const said = [...(reset === null ? [] : [`se reinicia ${reset}`]), ...(doubt === null ? [] : [doubt])]
 
       return figureRow(
         WINDOW_NAMES[limit.kind] ?? limit.kind,
-        limit.percentUsed,
+        isInDoubt ? null : limit.percentUsed,
         said.length === 0 ? null : said.join(' · '),
       )
     }),

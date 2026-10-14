@@ -14,6 +14,7 @@ import {
   LIMITS,
   QUIET_SIGNALS,
   TOPIC_SYSTEM,
+  UNKNOWN,
   adviceFor,
   agentNoted,
   barCellsFor,
@@ -522,9 +523,9 @@ export const register: Register = on => {
     // A muted label, a thick rounded bar coloured up to what is used, and the percentage
     // in bold; at the danger level the whole gauge takes the colour.
     const gauge = (one: Gauge) => {
-      const used = filledCells(one.percent, cells)
-      // A reading in doubt loses its colour: muted, and its percentage written as approximate.
+      // A reading in doubt is not drawn as a figure: an empty bar and a dash, muted.
       const isStale = one.isStale === true
+      const used = isStale ? 0 : filledCells(one.percent, cells)
       const color = isStale ? MUTED : LEVEL_COLORS[one.level]
       const isDanger = !isStale && one.level === 'danger'
 
@@ -538,7 +539,7 @@ export const register: Register = on => {
             </Text>
           ) : (
             <Svg
-              source={barSvg(one.percent, color, TRACK, cells * LIMITS.cellPx, LIMITS.barHeightPx)}
+              source={barSvg(isStale ? 0 : one.percent, color, TRACK, cells * LIMITS.cellPx, LIMITS.barHeightPx)}
               alt={percentTextOf(one)}
               width={cells * LIMITS.cellPx}
               height={LIMITS.barHeightPx}
@@ -629,14 +630,23 @@ export const register: Register = on => {
     }
 
     // A label in a column of its own width, so the bars of a part start at the same place.
-    const row = (label: string, labelCells: number, percent: number, color: string, detail: string | null) => (
+    // A figure that is not known has no percentage: its bar is empty and a dash stands for it.
+    const row = (
+      label: string,
+      labelCells: number,
+      percent: number | null,
+      color: string,
+      detail: string | null,
+    ) => (
       <Box columnGap={1} alignItems="center">
         <Box width={labelCells} flexShrink={0}>
           <Text color={MUTED}>{label}</Text>
         </Box>
-        {bar(percent, color)}
+        {bar(percent ?? 0, color)}
         <Box width={5} flexShrink={0}>
-          <Text bold>{`${percent}%`}</Text>
+          <Text bold {...(percent === null ? { color: MUTED } : {})}>
+            {percent === null ? UNKNOWN : `${percent}%`}
+          </Text>
         </Box>
         {detail !== null && <Text color={MUTED}>{detail}</Text>}
       </Box>
@@ -648,7 +658,13 @@ export const register: Register = on => {
         {reportBlocks(withoutName(e.props.text, PLUGIN)).map(block => {
           switch (block.kind) {
             case 'figure':
-              return row(block.label, 10, block.percent, LEVEL_COLORS[levelFor(block.percent)], block.detail)
+              return row(
+                block.label,
+                10,
+                block.percent,
+                block.percent === null ? MUTED : LEVEL_COLORS[levelFor(block.percent)],
+                block.detail,
+              )
             case 'share':
               return row(block.label, LIMITS.reportLabelCells, block.percent, MUTED, block.amount)
             case 'fact':
