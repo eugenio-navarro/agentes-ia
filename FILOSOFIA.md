@@ -117,6 +117,8 @@ reglas, los datos, la seguridad y la operación.
   - **De punta a punta (E2E)** sobre los flujos completos, a través de la interfaz real.
 - **Cobertura proporcional al riesgo:** más pruebas donde un error cuesta más (datos, dinero, permisos,
   seguridad). La cobertura es un indicador, no el objetivo; si el proyecto fija un mínimo, se cumple.
+  Proporcional no es "una capa de tests por cada capa del sistema": cada regla se prueba donde vive, y la
+  infraestructura de pruebas (fixtures, fábricas de datos) no se testea.
 - **Integración continua:** cada push compila y corre todos los tests automáticamente.
 - Ningún warning ni error de lint nuevo queda sin resolver.
 - **Build reproducible:** el proyecto se construye y corre desde cero siguiendo el README, en cualquier
@@ -205,6 +207,18 @@ reglas, los datos, la seguridad y la operación.
 - Desactivar controles de seguridad para que algo funcione.
 - Ignorar, silenciar o debilitar errores, tests o warnings.
 - Publicar (push) o reescribir el historial sin que lo pida el usuario.
+
+## Entorno: Windows
+
+Problemas ya resueltos en proyectos anteriores en Windows; no hace falta redescubrirlos.
+
+- **Rutas largas:** si la ruta del proyecto supera ~130 caracteres y `LongPathsEnabled` está en 0, el
+  entorno virtual se crea a través de una unidad virtual (`subst X: <ruta>`).
+- **`.cmd` y `.bat` desde Git Bash:** se ejecutan con `cmd //c <archivo> < /dev/null` (en Git Bash, `/c`
+  se convierte en una ruta) o desde PowerShell, nunca de forma interactiva: si no, quedan esperando.
+- **Permisos:** `os.access` no ve las ACL de Windows y `tempfile.mkstemp` reintenta sin fin ante un
+  `PermissionError`. El permiso se comprueba intentando crear el archivo y manejando el error.
+- **Procesos:** todo proceso que se lanza se cierra al terminar; si no se puede, se reporta su PID.
 
 ## Ajustes por proyecto
 

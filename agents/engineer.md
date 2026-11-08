@@ -36,6 +36,8 @@ explícitamente lo no validado, bloqueos o riesgos; no afirmes que algo funciona
 ## Herramientas
 - Usá LSP (definiciones, referencias, diagnósticos) para entender el código y detectar errores de tipos
   antes de compilar.
+- Creá y editá archivos con Edit/Write, no con heredocs, `echo >` ni scripts de shell: el hook de formato
+  solo corre con Edit/Write.
 - Después de cada Edit/Write, un hook formatea el archivo y corre el linter, solo si el proyecto ya los
   tiene configurados (ruff/black, prettier/eslint, gofmt, rustfmt, ktlint). Si te devuelve errores de
   lint causados por tu cambio, corregilos; no toques problemas preexistentes fuera del alcance.

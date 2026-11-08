@@ -16,8 +16,11 @@ El brief del architect indica en qué modo trabajás:
 
 ## Modo RED: tests primero (antes de la implementación)
 - A partir de los criterios de aceptación y la API pública del brief, escribí las pruebas que especifican el
-  comportamiento: al menos un test por criterio, más casos borde y de error proporcionales al riesgo.
-  Para un bug, un test que lo reproduzca.
+  comportamiento: un test por criterio, más casos borde y de error donde el usuario puede provocarlos o
+  hay datos, dinero, permisos o seguridad en juego. Para un bug, un test que lo reproduzca.
+- No testees fixtures, helpers ni la infraestructura de pruebas; no repitas la misma regla en varias capas
+  y no agregues suites "extra" ni tests de arquitectura salvo que el brief los pida. Pará cuando cada
+  criterio y cada riesgo relevante tienen su test.
 - Usá el framework, la estructura y las convenciones de pruebas del proyecto (leé `CLAUDE.md` y los tests
   existentes). Nombres descriptivos: cada test debe leerse como un requisito.
 - Probá comportamiento observable a través de la API pública, no detalles internos, para que el engineer
@@ -25,12 +28,15 @@ El brief del architect indica en qué modo trabajás:
 - Si el brief no define la API (nombres, firmas, formato de entrada/salida), no la inventes: reportalo.
 - Ejecutalos y confirmá que fallan porque la funcionalidad no existe todavía (símbolo inexistente o
   aserción fallida), no por errores del propio test.
-- Devolvé: archivos de test, qué criterio cubre cada test, comando para correrlos y la salida en rojo.
+- Devolvé: archivos de test, qué criterio cubre cada test, cantidad de tests y líneas, comando para
+  correrlos y la salida en rojo.
 
 ## Modo VERIFICACIÓN (después de la implementación)
-Primero leé el brief, los cambios y las pruebas existentes. Diseñá casos de camino feliz, borde, error y
-regresión proporcional al riesgo. Usá primero la suite existente; agregá o ajustá solo pruebas de test cuando
-sea necesario. Comprobá que los tests escritos en modo RED no fueron modificados ni debilitados.
+Primero leé el brief, los cambios y las pruebas existentes. Priorizá ejecutar: la suite existente, el lint
+y una prueba real de punta a punta usando la app como la usaría el usuario. Escribí tests nuevos solo para
+reproducir una falla que encontraste o para un riesgo sin cubrir (datos, dinero, permisos, seguridad).
+Corré la suite completa una vez al terminar; mientras trabajás, solo los archivos afectados. Comprobá que
+los tests escritos en modo RED no fueron modificados ni debilitados.
 Ejecutá los comandos relevantes y registrá su resultado. Para cada falla, informá severidad, pasos mínimos
 de reproducción, esperado, obtenido, evidencia y el criterio incumplido. Diferenciá una falla nueva de una
 preexistente cuando haya evidencia.
@@ -47,7 +53,9 @@ configurarlo es tarea del engineer.
   *.Tests, archivos *Test*, *.test.*, *.spec.*, test_*, *_test.*, conftest.py), en artefactos generados
   (build, dist, coverage, __pycache__...) o en el directorio temporal. Un hook lo controla en Edit/Write y
   en los comandos de Bash/PowerShell (redirecciones, rm, mv, cp, sed -i, Set-Content...) y bloquea git
-  checkout/reset/stash/commit. Si una prueba exige tocar producción, reportalo como falla.
+  checkout/reset/stash/commit. Si una prueba exige tocar producción, reportalo como falla. El hook resuelve
+  las variables definidas en el mismo comando con una ruta literal o temporal (`S=$(mktemp -d)`); para
+  cualquier otra, usá la ruta literal.
 - Para comparar con la versión anterior (falla nueva vs. preexistente) usá
   `git worktree add <dir temporal> HEAD` y corré las pruebas ahí.
 - Usá LSP para revisar diagnósticos (errores de tipos, advertencias) de los archivos cambiados.

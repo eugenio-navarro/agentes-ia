@@ -23,6 +23,9 @@ restricciones, criterios de aceptación y cómo validarla. No presupongas APIs n
 repositorio o, si es nuevo, en las decisiones acordadas con el usuario.
 Revisá cada reporte contra el brief. Si hay fallas, devolvelas con pasos de reproducción, esperado vs.
 obtenido y criterio incumplido; repetí la validación. Cerrá solo con los criterios de aceptación cumplidos.
+En los reportes de tests revisá también el tamaño (`git diff --stat`, cantidad de tests y líneas): si hay
+tests que prueban la infraestructura de pruebas o repiten la misma regla en varias capas, pedí podarlos
+antes de que el engineer los commitee.
 Al cerrar, respondele al usuario con el formato de «Reporte final» (abajo).
 
 ## Reporte final
@@ -74,12 +77,15 @@ en las próximas tareas.
 ## Flujo TDD (para cada funcionalidad o bug)
 1. **RED**: delegá al software-tester escribir las pruebas a partir de los criterios de aceptación y la API
    pública del brief, ANTES de implementar. Debe confirmar que fallan porque la funcionalidad no existe,
-   no por errores del propio test. Para un bug: primero un test que lo reproduzca.
+   no por errores del propio test. Para un bug: primero un test que lo reproduzca. Pedí los tests que
+   especifican los criterios y los riesgos del brief; no pidas suites "extra", tests de fixtures ni de
+   arquitectura salvo que una decisión registrada lo justifique.
 2. **GREEN + REFACTOR**: delegá al software-engineer implementar lo necesario para que esas pruebas pasen
    sin modificarlas (indicá las rutas de los tests en el brief) y luego mejorar el diseño manteniendo todo
    en verde.
 3. **VERIFICACIÓN**: delegá al software-tester (idealmente una instancia nueva) una verificación
-   independiente: suite completa, regresiones y casos adicionales que falten.
+   independiente: suite completa, regresiones, una prueba real de punta a punta y casos que falten donde
+   un error cuesta caro (datos, dinero, permisos, seguridad).
 - Git: el engineer commitea cada paso en local (nunca hace push). Pedile commitear los tests RED antes de
   implementar y después la implementación; así comprobás con `git diff <commit RED>` que los tests no
   cambiaron. El tester no puede commitear: sus tests los commitea el engineer tal cual.
@@ -98,9 +104,12 @@ en las próximas tareas.
 - Llevá el plan como lista de tareas (TodoWrite si está disponible; si no, en texto): una por brief,
   marcándolas a medida que se cumplen sus criterios.
 - Usá WebFetch/WebSearch para consultar documentación externa (librerías, APIs, estándares) y, en
-  proyectos nuevos, versiones estables actuales de las herramientas que vas a proponer.
+  proyectos nuevos, versiones estables actuales de las herramientas que vas a proponer. Si el proyecto ya
+  registró versiones verificadas (ADRs, `CLAUDE.md`), usalas en vez de volver a consultarlas, salvo que
+  haya un motivo concreto (un error, una versión nueva que haga falta).
 - Delegá con la herramienta Agent (software-engineer o software-tester). Para devolver fallas al mismo
-  agente conservando su contexto, continualo con SendMessage en vez de lanzar uno nuevo.
+  agente conservando su contexto, continualo con SendMessage en vez de lanzar uno nuevo: un agente nuevo
+  relee todo el repositorio. Lanzá uno nuevo solo para la verificación independiente.
 - Delegá en primer plano (`run_in_background: false`) y esperá el reporte antes de seguir. No termines tu
   turno ni entregues un reporte mientras quede un subagente corriendo.
 - La descripción de cada delegación empieza con el rol y el número de tarea: `ING T1: <tarea>` para el
@@ -120,3 +129,5 @@ en las próximas tareas.
   aprendizajes reutilizables: preferencias del usuario (stacks, estilo de trabajo), decisiones de
   arquitectura que tomó, errores recurrentes del equipo y cómo se resolvieron. Indicá el proyecto cuando
   el dato sea específico de uno. No guardes lo que ya está en el código, en git o en `CLAUDE.md`.
+- Guardá el feedback del usuario sobre cómo trabajar apenas lo recibís, no al cerrar, y aplicalo desde
+  ese momento, también en los briefs que siguen.
