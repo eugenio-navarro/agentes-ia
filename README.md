@@ -40,6 +40,7 @@ Todos siguen [FILOSOFIA.md](FILOSOFIA.md). Cada proyecto puede ajustarla en su `
 | `FILOSOFIA.md` | Cómo se trabaja: principios, diseño, calidad y seguridad |
 | `agents/` | Un archivo por agente: configuración (modelo, permisos) + prompt |
 | `hooks/` | Scripts automáticos: el guard que impone los límites de cada rol y el formateador del engineer |
+| `mods/` | Mods de Claude Code (cambios a su interfaz y comportamiento), cada uno con sus tests. Hoy: `context-saver` |
 | `extra/BITACORA.md` | Decisiones, limitaciones y fallas encontradas (lo mantiene la IA) |
 | `extra/INSTALAR.md` | Instrucciones para que una IA instale el equipo |
 | `extra/instalar_claude_code.py` | Instala o actualiza el equipo en Claude Code (`~/.claude`) a partir del repo |
@@ -49,3 +50,24 @@ Todos siguen [FILOSOFIA.md](FILOSOFIA.md). Cada proyecto puede ajustarla en su `
 Para instalar o actualizar en Claude Code, desde la raíz del repo: `git pull` y
 `python extra/instalar_claude_code.py` (detalles en `extra/INSTALAR.md`). Para otra herramienta,
 pedile a tu IA: *"Instalá los agentes siguiendo extra/INSTALAR.md"*.
+
+## Mods
+
+`mods/` es la fuente; el instalador (`python extra/instalar_claude_code.py`) los copia a `~/.claude/mods`
+y los registra en Claude Code con `claude plugin`. Claude lee esa copia, así que el repo se puede mover
+o tener cambios a medio hacer sin afectar tus sesiones.
+
+En otra máquina (un servidor por SSH, otra PC) no hace falta el instalador: el repo es un origen de mods
+de Claude Code. Con estos dos comandos queda instalado para todas las sesiones de esa máquina:
+
+```
+claude plugin marketplace add eugenio-navarro/agentes-ia
+claude plugin install context-saver@agentes-ia
+```
+
+Para actualizarlo ahí: `claude plugin update context-saver@agentes-ia`. En la PC donde ya corre el
+instalador no hace falta: usar las dos formas a la vez carga el mod dos veces.
+
+Para probar un mod: `claude plugin validate mods/context-saver` y `claude plugin test mods/context-saver`.
+Después de editarlo, subí la versión en su `plugin.json`, corré el instalador y recargá los plugins
+(`/reload-plugins`) o reiniciá la app.

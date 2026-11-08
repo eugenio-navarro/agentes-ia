@@ -16,8 +16,11 @@ Qué hace en `~/.claude` (el repo es la fuente de verdad):
                         de esta máquina.
 - FILOSOFIA.md          copia; se agrega `@~/.claude/FILOSOFIA.md` a CLAUDE.md si no está (sin borrar
                         lo que ya tenga).
+- mods/                 copia de `mods/` (sin los tests de cada mod). Después registra esa carpeta como
+                        origen de mods e instala o actualiza cada uno con la CLI `claude plugin`.
 Antes de reemplazar un archivo que cambia, guarda la versión anterior en
-`~/.claude/backups-agentes/<fecha>/`. Si no cambia, no lo toca. No modifica settings.json.
+`~/.claude/backups-agentes/<fecha>/`. Si no cambia, no lo toca. No edita settings.json: lo único que
+lo cambia es el registro de los mods, que hace la CLI de Claude.
 """
 import argparse
 import datetime
@@ -25,6 +28,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -147,6 +151,10 @@ def plan(destino):
         if not hook.name.startswith("test_"):  # los tests de los hooks se quedan en el repo
             archivos.append((hooks_dir / hook.name, con_lf(hook)))
     archivos.append((destino / "FILOSOFIA.md", con_lf(REPO / "FILOSOFIA.md")))
+    for archivo in sorted((REPO / "mods").rglob("*")):
+        relativo = archivo.relative_to(REPO / "mods")
+        if archivo.is_file() and "tests" not in relativo.parts:  # los tests de cada mod se quedan en el repo
+            archivos.append((destino / "mods" / relativo, con_lf(archivo)))
     claude_md = destino / "CLAUDE.md"
     actual = claude_md.read_text(encoding="utf-8") if claude_md.exists() else ""
     if LINEA_FILOSOFIA not in actual.splitlines():
@@ -182,6 +190,55 @@ def instalar(destino, simular):
         print("Listo. Los cambios aplican desde la próxima sesión de Claude Code.")
 
 
+def registrar_mods(destino, simular, entorno=None, ejecutar=subprocess.run, buscar=shutil.which):
+    """Registra `destino/mods` como origen de mods en Claude Code e instala o actualiza cada mod.
+
+    Es lo único que cambia settings.json, y lo hace la CLI `claude plugin`, no este script. Si el origen
+    ya estaba registrado en otra carpeta (por ejemplo el repo), lo reemplaza por la copia instalada.
+    `entorno` son las variables con las que corre la CLI; `ejecutar` y `buscar` existen para los tests.
+    """
+    catalogo = json.loads((REPO / "mods" / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8"))
+    origen, carpeta = catalogo["name"], destino / "mods"
+    mods = [f"{mod['name']}@{origen}" for mod in catalogo["plugins"]]
+    if simular:
+        print(f"[simulación] registrar mods: {', '.join(mod['name'] for mod in catalogo['plugins'])}")
+        return
+    claude = buscar("claude")
+    if not claude:
+        print("No encontré la CLI `claude`: los mods quedaron copiados pero sin registrar. Para registrarlos:")
+        print(f'  claude plugin marketplace add "{carpeta}"')
+        for mod in mods:
+            print(f"  claude plugin install {mod}")
+        return
+
+    def cli(*args):
+        return ejecutar([claude, "plugin", *args], capture_output=True, text=True, env=entorno)
+
+    def listado(*args):
+        resultado = cli(*args, "--json")
+        try:
+            return json.loads(resultado.stdout) if resultado.returncode == 0 else []
+        except ValueError:
+            return []
+
+    registrado = next((o for o in listado("marketplace", "list") if o.get("name") == origen), None)
+    instalados = {plugin.get("id") for plugin in listado("list")}
+    en_otra_carpeta = registrado is not None and Path(registrado.get("path", "")) != carpeta
+    if en_otra_carpeta:  # se desinstala antes de quitar el origen para no dejar mods sin origen
+        for mod in mods:
+            if mod in instalados:
+                cli("uninstall", mod)
+        cli("marketplace", "remove", origen)
+        instalados = set()
+    if registrado is None or en_otra_carpeta:
+        cli("marketplace", "add", str(carpeta))
+    for mod in mods:
+        resultado = cli("update" if mod in instalados else "install", mod)
+        estado = "registrado" if resultado.returncode == 0 else "no se pudo registrar"
+        detalle = "" if resultado.returncode == 0 else f": {(resultado.stderr or resultado.stdout).strip()}"
+        print(f"mod {mod}: {estado}{detalle}")
+
+
 def main():
     for flujo in (sys.stdout, sys.stderr):  # consola de Windows sin UTF-8
         reconfigurar = getattr(flujo, "reconfigure", None)
@@ -192,7 +249,11 @@ def main():
     p.add_argument("--destino", help="carpeta de Claude Code (por defecto ~/.claude)")
     args = p.parse_args()
     por_defecto = os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / ".claude"
-    instalar(Path(args.destino or por_defecto).expanduser(), args.simular)
+    destino = Path(args.destino or por_defecto).expanduser()
+    instalar(destino, args.simular)
+    # Con --destino la CLI tiene que registrar los mods en esa carpeta y no en la del usuario.
+    entorno = {**os.environ, "CLAUDE_CONFIG_DIR": str(destino)} if args.destino else None
+    registrar_mods(destino, args.simular, entorno)
 
 
 if __name__ == "__main__":

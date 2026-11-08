@@ -1,0 +1,6 @@
+{
+  "name": "agentes-ia",
+  "description": "Mods de Claude Code de Eugenio Navarro, instalables directo desde GitHub.",
+  "owner": { "name": "Eugenio Navarro" },
+  "plugins": [{ "name": "context-saver", "source": "./mods/context-saver" }]
+}

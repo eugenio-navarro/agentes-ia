@@ -1,0 +1,6 @@
+{
+  "name": "claude-mods",
+  "description": "Mods personales de Claude Code de Eugenio Navarro.",
+  "owner": { "name": "Eugenio Navarro" },
+  "plugins": [{ "name": "context-saver", "source": "./context-saver" }]
+}
