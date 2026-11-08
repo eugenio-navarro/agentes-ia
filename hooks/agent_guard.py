@@ -20,12 +20,14 @@ READ_ONLY_COMMANDS = {
     "ls", "dir", "cat", "head", "tail", "wc", "pwd", "tree", "grep", "rg",
     "which", "where", "file", "stat", "du", "df", "echo", "printf", "basename",
     "dirname", "realpath", "sort", "uniq", "cut", "diff", "env", "date", "whoami",
+    "find", "type", "ps",  # find -exec/-delete se bloquea antes
     # PowerShell
     "get-childitem", "gci", "get-content", "gc", "get-location", "gl",
     "select-string", "sls", "test-path", "get-item", "gi", "measure-object",
     "select-object", "where-object", "sort-object", "format-table", "ft",
     "format-list", "fl", "get-command", "resolve-path", "write-output",
     "get-date", "get-filehash", "compare-object", "out-string",
+    "get-process", "gps", "get-itemproperty", "gp",
     # moving around (cd dir && git status)
     "cd", "chdir", "set-location", "sl", "push-location", "pop-location",
 }
@@ -34,12 +36,62 @@ GIT_READ_ONLY = {
     "describe", "shortlog", "grep", "cat-file", "reflog", "merge-base",
 }
 GIT_LIST_ONLY = {"branch", "remote", "tag", "stash"}  # allowed only when listing
-VERSION_FLAGS = {"--version", "-v", "-V", "version", "--help", "-h"}
+VERSION_FLAGS = {"--version", "-version", "-v", "-V", "version", "--help", "-h"}
+PY_LAUNCHER_LIST = {"--list", "--list-paths", "-0", "-0p"}  # py.exe: lista los Python instalados
+SEPARATORS = r"&&|\|\||[;|\n]"
+NULL_REDIRECT = r"\d?>\s*(&\d|/dev/null|\$null|NUL)\b"
 
 
 def deny(msg):
     print(msg, file=sys.stderr)
     sys.exit(2)
+
+
+def mask_quoted(command, powershell=False):
+    """Same length as `command`, with the shell operators inside quotes replaced by `_`.
+
+    Single quotes are literal: everything inside is masked. Double quotes still expand
+    `$(...)` and backticks, so only the operators (| ; & < > newline) are masked there.
+    The escape character is the backslash in bash and the backtick in PowerShell. If a quote
+    is left open, nothing is masked (the checks stay as strict as without quotes).
+    """
+    escape = "`" if powershell else "\\"
+    out, quote, i = [], None, 0
+    while i < len(command):
+        c = command[i]
+        if c == escape and quote != "'" and i + 1 < len(command):
+            out.append(c + ("_" if quote and command[i + 1] in "|;&<>\n" else command[i + 1]))
+            i += 2
+            continue
+        if quote is None:
+            if c in "'\"":
+                quote = c
+            out.append(c)
+        elif c == quote:
+            quote = None
+            out.append(c)
+        elif quote == "'":
+            out.append("_")
+        else:
+            out.append("_" if c in "|;&<>\n" else c)
+        i += 1
+    return command if quote else "".join(out)
+
+
+def split_segments(command, masked):
+    """Split `command` on the separators found outside quotes (`masked` marks them)."""
+    segments, start = [], 0
+    for m in re.finditer(SEPARATORS, masked):
+        segments.append(command[start:m.start()])
+        start = m.end()
+    segments.append(command[start:])
+    return segments
+
+
+def blank_spans(text, spans):
+    for a, b in spans:
+        text = text[:a] + " " * (b - a) + text[b:]
+    return text
 
 
 def check_segment(seg):
@@ -73,8 +125,12 @@ def check_segment(seg):
                     for a in rest):
                 return None
         return f"git {sub}".strip()
-    if cmd == "find" and any(a in ("-delete", "-exec", "-execdir", "-ok", "-fprint")
-                             for a in args):
+    if cmd == "command" and args[:1] in (["-v"], ["-V"]):
+        return None  # command -v ffmpeg: ¿está instalado?
+    if cmd == "py" and args and all(a in PY_LAUNCHER_LIST or a in VERSION_FLAGS for a in args):
+        return None
+    if cmd == "find" and any(a in ("-delete", "-exec", "-execdir", "-ok", "-okdir", "-fls")
+                             or a.startswith("-fprint") for a in args):
         return "find con -delete/-exec"
     if cmd in READ_ONLY_COMMANDS:
         return None
@@ -87,13 +143,15 @@ def guard_architect(data):
     if data.get("tool_name") not in ("Bash", "PowerShell"):
         return
     command = data.get("tool_input", {}).get("command", "")
+    masked = mask_quoted(command, data.get("tool_name") == "PowerShell")
     # harmless redirections of stderr/stdout to null
-    cleaned = re.sub(r"\d?>\s*(&\d|/dev/null|\$null|NUL)\b", " ", command)
-    if re.search(r">|\$\(|<\(|`", cleaned):
+    nulls = [m.span() for m in re.finditer(NULL_REDIRECT, masked)]
+    masked, command = blank_spans(masked, nulls), blank_spans(command, nulls)
+    if re.search(r">|\$\(|<\(|`", masked):
         deny("Bloqueado: el software-architect solo puede ejecutar comandos de "
              "lectura (sin redirecciones '>', sustituciones $() ni backticks). "
              "Delegá cualquier cambio al software-engineer.")
-    for seg in re.split(r"&&|\|\||[;|\n]", cleaned):
+    for seg in split_segments(command, masked):
         bad = check_segment(seg)
         if bad:
             deny(f"Bloqueado: '{bad}' no está en la lista de comandos de solo "
@@ -151,6 +209,62 @@ def is_test_path(path, cwd=""):
         bool(TEST_FILE.search(parts[-1]))
 
 
+# Values that are a fresh temp file/dir. mktemp only without a directory of its own (-p, a template
+# with a path, or a template without -t/--tmpdir create it elsewhere).
+TEMP_VALUES = [re.compile(p, re.IGNORECASE) for p in (
+    r"^\$\(\s*mktemp(\s+(-d|-u|--directory|--dry-run))*\s*\)$",
+    r"^\$\(\s*mktemp(\s+(-d|-u|-t|-dt|-td|--directory|--tmpdir))*\s+(-t|-dt|-td|--tmpdir)"
+    r"\s+[^\s/\\]+\s*\)$",
+    r"^\[System\.IO\.Path\]::GetTemp(Path|FileName)\(\)$",
+    r"^New-TemporaryFile$",
+    r"^\$env:te?mp$",
+    r"^(New-Item\s+(-ItemType\s+\w+\s+)?-Path\s+)?\(?\s*Join-Path\s+\$env:te?mp\s+['\"]?[\w.-]+['\"]?\s*\)?"
+    r"(\s+-ItemType\s+\w+)?(\s+-Force)?$",
+)]
+UNRESOLVED_VAR = re.compile(r"\$(?!env:te?mp\b|te?mp\b|null\b)\{?[A-Za-z_]", re.IGNORECASE)
+UNKNOWN = object()
+
+
+def assigned_variables(segments, powershell):
+    """Variables assigned in the same command (`S=$(mktemp -d)`, `$d = ...`).
+
+    A temp-dir value resolves to the temp dir; a literal path, to itself; anything else (or a
+    variable assigned twice with different values) stays unknown and the target is blocked.
+    """
+    pattern = r"^\s*\$([A-Za-z_]\w*)\s*=\s*(.+)$" if powershell else \
+        r"^\s*(?:export\s+)?([A-Za-z_]\w*)=(.*)$"
+    found = {}
+    for seg in segments:
+        m = re.match(pattern, seg.strip(), re.DOTALL)
+        if not m:
+            continue
+        name, value = m.group(1), m.group(2).strip().strip("'\"")
+        if ".." not in value and any(t.match(value) for t in TEMP_VALUES):
+            value = tempfile.gettempdir()
+        elif re.search(r"[$()\[\]{}`\s]", value):
+            value = UNKNOWN
+        found.setdefault(name, set()).add(value if value is UNKNOWN else value.replace("\\", "/"))
+    return {k: (next(iter(v)) if len(v) == 1 else UNKNOWN) for k, v in found.items()}
+
+
+def resolve_variables(target, variables, powershell):
+    prop = r"(?:\.\w+)?" if powershell else ""  # $d.FullName en PowerShell
+
+    def sub(m):
+        name = m.group(1) or m.group(2)
+        value = variables.get(name)
+        if value is None:
+            value = os.environ.get(name)
+        return m.group(0) if value is None or value is UNKNOWN else value
+    return re.sub(r"\$\{(\w+)\}|\$(?!env:)(\w+)" + prop, sub, target)
+
+
+def deny_unresolved(path):
+    deny(f"Bloqueado: el hook no puede saber a qué carpeta apunta '{path}' (variable de shell "
+         "que no se definió en este mismo comando con una ruta literal o temporal). Usá una ruta "
+         "literal al archivo de prueba o al directorio temporal.")
+
+
 def deny_tester(path):
     deny(f"Bloqueado: '{path}' no parece un archivo de prueba. El "
          "software-tester NO modifica código de producción: reportá la falla "
@@ -169,7 +283,22 @@ SHELL_COPIERS = {"cp", "copy", "copy-item", "cpi"}  # only the destination matte
 PS_PATH_PARAMS = {"-path", "-literalpath", "-filepath", "-destination"}
 
 
-def check_tester_segment(tokens, cwd):
+def redirect_targets(command, masked):
+    """Targets of `>` / `>>` outside quotes; `2>&1` is not a target."""
+    targets = []
+    for m in re.finditer(r"\d?>>?", masked):
+        rest = command[m.end():].lstrip("|").lstrip()  # `>|` (clobber) is also a write
+        if not rest or rest[0] == "&":
+            continue
+        if rest[0] in "'\"":
+            end = rest.find(rest[0], 1)
+            targets.append(rest[1:end] if end > 0 else rest[1:])
+        else:
+            targets.append(re.match(r"[^\s;&|]*", rest).group(0))
+    return [t for t in targets if t]
+
+
+def check_tester_segment(tokens, cwd, check_path):
     while tokens and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", tokens[0]):
         tokens = tokens[1:]
     if not tokens:
@@ -206,8 +335,7 @@ def check_tester_segment(tokens, cwd):
     else:
         return
     for t in targets:
-        if t.lower() not in NULL_TARGETS and not is_test_path(t, cwd):
-            deny_tester(t)
+        check_path(t)
 
 
 def guard_tester(data):
@@ -221,17 +349,32 @@ def guard_tester(data):
     if data.get("tool_name") not in ("Bash", "PowerShell"):
         return
     command = ti.get("command", "")
-    # redirections: `> file`, `>> file`, `2> file` (but not `2>&1` / null)
-    for target in re.findall(r"\d?>>?\s*(\"[^\"]+\"|'[^']+'|[^\s;&|]+)", command):
-        if not target.startswith("&") and target.strip("'\"").lower() not in NULL_TARGETS \
-                and not is_test_path(target, cwd):
-            deny_tester(target.strip("'\""))
-    for seg in re.split(r"&&|\|\||[;|\n]", command):
+    powershell = data.get("tool_name") == "PowerShell"
+    masked = mask_quoted(command, powershell)
+    segments = split_segments(command, masked)
+    variables = assigned_variables(segments, powershell)
+
+    def check_path(target):
+        if target.lower() in NULL_TARGETS:
+            return
+        path = resolve_variables(target, variables, powershell)
+        if UNRESOLVED_VAR.search(path):
+            deny_unresolved(target)
+        if not is_test_path(path, cwd):
+            deny_tester(target)
+
+    # redirections: `> file`, `>> file`, `2> file` (but not `2>&1`)
+    for target in redirect_targets(command, masked):
+        check_path(target)
+    for seg in segments:
+        # PowerShell: (Join-Path A B) -> A/B, so the path is a single argument
+        seg = re.sub(r"\(\s*Join-Path\s+(?:-Path\s+)?(\S+)\s+(?:-ChildPath\s+)?([^)\s]+)\s*\)",
+                     r"\1/\2", seg, flags=re.IGNORECASE)
         try:
             tokens = shlex.split(seg, posix=True)
         except ValueError:
             tokens = seg.split()
-        check_tester_segment(tokens, cwd)
+        check_tester_segment(tokens, cwd, check_path)
 
 
 # --- architect: writes only into its own agent memory ---------------------

@@ -38,8 +38,28 @@ class ArchitectGuard(unittest.TestCase):
                     "rm -rf x", "ls $(rm x)", "find . -delete", "npm install", "python -m unittest"):
             self.blocked(cmd)
 
+    def test_permite_busquedas_y_consultas_de_herramientas(self):
+        for cmd in ('find . -name "*.py" | wc -l', "find src -type f", "which ffmpeg",
+                    "where.exe tesseract", "command -v magick", "ffmpeg -version",
+                    "magick -version", "py --list", "py -0p", "type ffmpeg"):
+            self.allowed(cmd)
+
+    def test_lo_que_va_entre_comillas_no_es_un_operador(self):
+        for cmd in ('grep -E "^def test_|^class " tests/test_a.py', 'grep -n "a > b" src/a.py',
+                    "grep -c '^def test_' tests/*.py | sort", 'rg "x; y" src', "grep '$(no)' a.txt"):
+            self.allowed(cmd)
+        for cmd in ('grep "$(rm a)" b.txt', 'echo "a|b" > a.txt', "grep 'x' a.txt; rm a.txt",
+                    'echo \\" > a.txt \\"', 'grep "a\\" > b.txt', 'echo "sin cerrar > a.txt',
+                    "find . -fprintf out.txt %p", "find . -fls out.txt"):
+            self.blocked(cmd)
+        # en PowerShell la barra invertida no escapa: "C:\a\" cierra la cadena
+        self.assertEqual(guard("architect", "PowerShell", command='Get-Content "C:\\a\\" > src/main.py'), 2)
+
     def test_powershell(self):
         self.assertEqual(guard("architect", "PowerShell", command="Get-ChildItem src | Select-Object Name"), 0)
+        self.assertEqual(guard("architect", "PowerShell", command="Get-Process | Select-Object Name"), 0)
+        self.assertEqual(guard("architect", "PowerShell",
+                               command="Get-ItemProperty HKLM:/SYSTEM/CurrentControlSet/Control/FileSystem"), 0)
         self.assertEqual(guard("architect", "PowerShell", command="Set-Content a.txt hi"), 2)
 
     def test_edita_solo_su_memoria(self):
@@ -77,6 +97,42 @@ class TesterGuard(unittest.TestCase):
         for cmd in ("echo x > src/main.py", "rm src/main.py", "cp /tmp/x.py src/main.py",
                     "git stash", "git checkout -- src", "sed -i s/a/b/ hooks/agent_guard.py"):
             self.assertEqual(self.bash(cmd), 2, cmd)
+
+
+    def test_resuelve_variables_definidas_en_el_mismo_comando(self):
+        for cmd in ("S=$(mktemp -d); echo x > $S/acl_prueba", 'S=$(mktemp -d) && echo x > "$S/a b.txt"',
+                    "D=tests/fixtures; cp datos.csv $D/datos.csv", "D=tests; rm -rf ${D}/tmp",
+                    "echo x > $TMP/a.txt"):
+            self.assertEqual(self.bash(cmd), 0, cmd)
+        for cmd in ("S=src; echo x > $S/main.py", "echo x > $DESCONOCIDA/a.txt",
+                    "S=tests; S=src; echo x > $S/main.py", "S=/tmp/../proj/src; echo x > $S/main.py",
+                    "S=$(mktemp -d -p src); echo x > $S/a", "S=$(mktemp -d); echo x > $S/../../proj/src/a.py",
+                    "S=$(mktemp src/XXXX); echo x > $S", "echo x >| src/main.py",
+                    'echo \\" > src/main.py \\"'):
+            self.assertEqual(self.bash(cmd), 2, cmd)
+
+    def test_resuelve_variables_de_powershell(self):
+        ps = lambda c: guard("tester", "PowerShell", agent="software-tester", command=c)
+        for cmd in ("$d = New-Item -ItemType Directory -Path (Join-Path $env:TEMP p); "
+                    "Set-Content -Path (Join-Path $d.FullName a.txt) -Value blanco",
+                    "$ruta = [System.IO.Path]::GetTempPath(); Set-Content -Path $ruta/a.txt -Value x"):
+            self.assertEqual(ps(cmd), 0, cmd)
+        self.assertEqual(ps("$r = 'src'; Set-Content -Path $r/main.py -Value x"), 2)
+        self.assertEqual(ps("$d = Join-Path $env:TEMP ../../proj/src; Set-Content -Path $d/a.py -Value x"), 2)
+        self.assertEqual(ps('echo `" > src/main.py `"'), 2)
+
+    def test_lo_que_va_entre_comillas_no_es_una_redireccion(self):
+        for cmd in ('grep -n "a > b" src/a.py', 'python -m pytest -k "a or b" | tail -5'):
+            self.assertEqual(self.bash(cmd), 0, cmd)
+        self.assertEqual(self.bash('echo "a > b" > src/a.py'), 2)
+
+    def test_avisa_que_use_rutas_literales(self):
+        data = {"tool_name": "Bash", "agent_type": "software-tester", "cwd": CWD,
+                "tool_input": {"command": "echo x > $NOSE/a.txt"}}
+        r = subprocess.run([sys.executable, os.path.join(HERE, "agent_guard.py"), "tester"],
+                           input=json.dumps(data), capture_output=True, text=True, encoding="utf-8")
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("ruta literal", r.stderr)
 
 
 class FormatOnEdit(unittest.TestCase):
