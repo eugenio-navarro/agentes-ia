@@ -61,7 +61,8 @@ de arriba.
 
 **Sesiones en la nube** (claude.ai/code): no ven `~/.claude` de tu PC. Pegá `extra/setup_nube.sh` en
 el campo **Setup script** del entorno: en cada sesión nueva clona este repo (tiene que ser público),
-y corre el instalador. La sesión arranca como Claude normal y los agentes quedan disponibles para
+y corre el instalador, que también instala los mods (busca la CLI `claude` si no está en el PATH y deja
+`claude plugin list` en el log). La sesión arranca como Claude normal y los agentes quedan disponibles para
 invocarlos. Como subagente, el architect no puede lanzar a otros: para que delegue en el engineer y el
 tester, la sesión tiene que arrancar como architect (`{"agent": "software-architect"}` en
 `~/.claude/settings.json`, agregado al final del script). La nube guarda una foto del entorno
