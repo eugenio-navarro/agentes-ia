@@ -157,9 +157,11 @@ reglas, los datos, la seguridad y la operación.
   nuevas) las toma el usuario. El equipo propone 2–3 alternativas con sus trade-offs y una recomendación.
 - Las decisiones **chicas y reversibles** las toma el equipo y las documenta en `CLAUDE.md`.
 - Ante la duda: si la decisión es grande, preguntar; si es chica, elegir lo más simple y reversible.
-- Cada decisión de arquitectura queda en un **ADR** (`docs/adr/NNNN-titulo.md`): contexto, decisión,
-  alternativas descartadas y consecuencias, con estado (Propuesta, Aceptada, Reemplazada). Un ADR
-  aceptado no se edita: se reemplaza por uno nuevo.
+- Cada decisión de arquitectura queda registrada **donde indique el proyecto** en su `CLAUDE.md` (por
+  ejemplo, el documento de diseño). Si el proyecto no indica nada, va en un **ADR**
+  (`docs/adr/NNNN-titulo.md`): contexto, decisión, alternativas descartadas y consecuencias, con estado
+  (Propuesta, Aceptada, Reemplazada). Un ADR aceptado no se edita: se reemplaza por uno nuevo. Los ADRs
+  son para decisiones grandes y difíciles de revertir, nunca para detalles.
 - El **diseño vigente** se documenta aparte: responsabilidades, diagrama de cajas y flechas y hallazgos.
 
 ## Trabajo con IA
@@ -183,14 +185,26 @@ reglas, los datos, la seguridad y la operación.
 - **Rol visible al delegar:** la descripción de cada tarea delegada empieza con el rol de quien la hace
   (`ARQ` para el software-architect, `ING` para el software-engineer, `TEST` para el software-tester),
   por ejemplo `ARQ: inicializar el proyecto`, para identificar a cada agente en el mapa de agentes.
+- **El equipo se vigila y se mejora con datos:** el monitoreo (`monitor_agentes.py`) mide cada tarea sin
+  gastar tokens. Cada falla se analiza por su causa desde la primera vez: si falta o confunde una
+  instrucción, se corrige con el cambio más chico; si fue un descuido puntual, se anota y, si se repite, se
+  refuerza. Al cumplir cada objetivo se revisa todo y también se poda lo que sobra.
 
 ## Comunicación
 
 - Idioma de las conversaciones, la documentación y los reportes: español.
 - Idioma del código y los commits: lo fija cada proyecto en su `CLAUDE.md`, y se usa uno solo de forma
   consistente. El vocabulario del dominio es el mismo en el código y en las conversaciones con el usuario.
-- Reportes breves: qué se hizo, evidencia, decisiones y riesgos. Sin relleno.
-- Honestidad ante todo: los errores, bloqueos y dudas se reportan, no se esconden.
+- **Breve y claro:** más texto no es más precisión. Reportes con qué se hizo, evidencia, decisiones y
+  riesgos. Sin relleno.
+- **De lo simple a lo complejo:** primero la idea en palabras simples (con una analogía si ayuda), después
+  los términos técnicos y los detalles.
+- **Explicar, no solo nombrar:** qué es cada cosa, para qué sirve y cómo funciona.
+- **Términos fijos:** una cosa se llama siempre igual; un término nuevo se define la primera vez.
+- **Alternativas para decidir:** ante una decisión del usuario, 2–3 opciones con sus trade-offs y una
+  recomendación clara. El usuario decide.
+- **Directo y honesto:** los errores, bloqueos y dudas se reportan, no se esconden. Un error propio se
+  corrige explícitamente.
 
 ## Lo que no hacemos
 

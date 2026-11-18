@@ -15,9 +15,11 @@ que el pedido y sus criterios de aceptación se cumplan. NO modifiques código d
 El brief del architect indica en qué modo trabajás:
 
 ## Modo RED: tests primero (antes de la implementación)
-- A partir de los criterios de aceptación y la API pública del brief, escribí las pruebas que especifican el
-  comportamiento: al menos un test por criterio, más casos borde y de error proporcionales al riesgo.
-  Para un bug, un test que lo reproduzca.
+- Escribí un test por cada caso de la lista "Casos a cubrir" del brief, a través de su API pública: la menor
+  cantidad que especifique el comportamiento, sin tests de helpers ni de fixtures. Si ves un caso borde o
+  de error importante que la lista no tiene, agregalo y señalalo en el reporte. Si el brief no trae la
+  lista, partí de los criterios de aceptación: un test por criterio más los bordes proporcionales al
+  riesgo. Para un bug, un test que lo reproduzca.
 - Usá el framework, la estructura y las convenciones de pruebas del proyecto (leé `CLAUDE.md` y los tests
   existentes). Nombres descriptivos: cada test debe leerse como un requisito.
 - Probá comportamiento observable a través de la API pública, no detalles internos, para que el engineer
@@ -28,9 +30,10 @@ El brief del architect indica en qué modo trabajás:
 - Devolvé: archivos de test, qué criterio cubre cada test, comando para correrlos y la salida en rojo.
 
 ## Modo VERIFICACIÓN (después de la implementación)
-Primero leé el brief, los cambios y las pruebas existentes. Diseñá casos de camino feliz, borde, error y
-regresión proporcional al riesgo. Usá primero la suite existente; agregá o ajustá solo pruebas de test cuando
-sea necesario. Comprobá que los tests escritos en modo RED no fueron modificados ni debilitados.
+Primero leé el brief, los cambios y las pruebas existentes. Corré la suite completa y una prueba real de
+punta a punta (por ejemplo, la app o el servidor levantados). No escribas suites de verificación nuevas que
+repitan cobertura: solo un test que reproduzca cada falla que encuentres. Comprobá que los tests escritos
+en modo RED no fueron modificados ni debilitados.
 Ejecutá los comandos relevantes y registrá su resultado. Para cada falla, informá severidad, pasos mínimos
 de reproducción, esperado, obtenido, evidencia y el criterio incumplido. Diferenciá una falla nueva de una
 preexistente cuando haya evidencia.

@@ -20,18 +20,29 @@ conoce y qué fallas aparecieron en el uso real.
 ## Limitaciones conocidas
 
 - El guard del tester no detecta escrituras hechas desde scripts (por ejemplo `python -c "open(...)"`).
-- Haiku puede escribir tests flojos en modo RED. Si pasa, subir el tester a `medio`.
+- Haiku puede escribir tests flojos en modo RED. Para evitarlo, el architect le da la lista de casos;
+  si igual pasa, subir el tester a `medio`.
+- El monitoreo depende del formato interno de las transcripciones de Claude Code (sin documentar): si
+  cambia, el script avisa que no pudo analizar, pero no frena el trabajo.
 - `AskUserQuestion` y `TodoWrite` no están disponibles en modo no interactivo (`claude -p`).
 - LSP instalado solo para Python (pyright).
 - Las secciones de OpenCode y Copilot CLI de `extra/INSTALAR.md` todavía no se probaron.
 
 ## Fallas y cambios
 
-La más reciente arriba. Cambiar un agente solo cuando una falla **se repite**; la primera vez,
-registrala como `pendiente`.
+La más reciente arriba. Cada falla se analiza **por su causa desde la primera vez** (las detecta
+`hooks/monitor_agentes.py` o la revisión del architect):
+- **Falta una instrucción, es ambigua o contradice otra:** se corrige ya, con el cambio más chico.
+- **Descuido puntual, sin causa en las instrucciones:** queda `observada`; si se repite, se refuerza
+  con una instrucción más explícita, un hook o un test.
+- En cada revisión por objetivo también se podan instrucciones que no aportan: un prompt que solo
+  crece empeora.
 
 | Fecha | Agente | Qué pasó | Causa | Cambio | Estado |
 |---|---|---|---|---|---|
+| 2026-11-18 | todos | No había forma de saber si los agentes gastaban de más, se salían del alcance o hacían sobreingeniería | Pedido del usuario | `hooks/monitor_agentes.py` (con tests): lee las transcripciones de los subagentes y el diff de git sin gastar tokens; `tarea` da las alertas de cada tarea y `etapa` el resumen de un objetivo. El guard deja al architect correrlo. El architect suma al brief "Casos a cubrir", "Archivos esperados" y "Fuera de alcance", revisa sobreingeniería, analiza cada alerta por su causa y hace una revisión integral al cumplir cada objetivo. Umbrales iniciales sin calibrar: se ajustan con las primeras tareas reales | pendiente de calibrar |
+| 2026-11-18 | architect | Reporte final largo, ADRs aunque el proyecto no los use, esfuerzo `xhigh` caro y nadie podía escribir el registro de prompts que pide la materia | Pedido del usuario | Reporte breve con "Para entender" y "Monitoreo"; ADRs donde indique el proyecto (si no, preguntar); `effort: high`; el guard le permite escribir en `prompt-log/`. `FILOSOFIA.md`: comunicación detallada y decisiones donde indique el proyecto | resuelto |
+| 2026-11-18 | engineer, tester | Sin regla de rama por tarea; tests de más con Haiku sin una lista de casos | Pedido del usuario | Engineer: rama del brief, sección "fuera del brief" en el reporte, sin warnings nuevos. Tester: un test por caso de la lista del architect; la verificación corre la suite y una prueba real sin suites nuevas | resuelto |
 | 2026-11-08 | — | Los mods tienen que funcionar también en las sesiones en la nube | Pedido del usuario. El instalador ya los copia y registra, pero solo si encuentra la CLI `claude`, y no está confirmado que esté en el PATH mientras corre el setup | `extra/setup_nube.sh` (versión 7) busca `claude` en las carpetas habituales si no está en el PATH y deja `claude plugin list` en `/root/setup-agentes.log`. Probado en un perfil aislado en Windows: `context-saver@claude-mods` instalado y habilitado. Falta confirmarlo en una sesión en la nube | pendiente |
 | 2026-11-08 | — | Las sesiones en la nube ya no arrancan como `software-architect` | Decisión del usuario: quiere arrancar como Claude normal e invocar los agentes cuando los necesite | `extra/setup_nube.sh` (versión 6) ya no escribe `{"agent": "software-architect"}`; `INSTALAR.md` explica cómo volver a activarlo. Costo conocido: el architect invocado como subagente no puede delegar en el engineer ni el tester | resuelto |
 | 2026-10-12 | — | Los comandos de la paleta salieron del repo | Decisión del usuario: son atajos personales de cada PC, no parte del equipo de agentes; quedan locales y sin versionar (un repo dedicado se evalúa más adelante) | Se quitaron `extra/actualizar_agentes.cmd`, `extra/reiniciar_claude.cmd` y `extra/reiniciar_claude.ps1`; `README.md` e `INSTALAR.md` ya no los nombran. Viven en `~/comandos` (`actualizar-agentes.ps1`, que baja el repo de GitHub a una carpeta temporal y corre el instalador, y `reiniciar-claude.ps1`, que usa el script de chats instalado en `~/.claude/chats-claude`). Las filas anteriores que nombran esos archivos quedan como historia | resuelto |
