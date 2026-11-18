@@ -47,6 +47,18 @@ class ArchitectGuard(unittest.TestCase):
         self.assertEqual(guard("architect", "Write", file_path=memory), 0)
         self.assertEqual(guard("architect", "Edit", file_path=f"{CWD}/src/main.py"), 2)
 
+    def test_corre_el_monitoreo_y_ningun_otro_script(self):
+        for cmd in ("python ~/.claude/hooks/monitor_agentes.py tarea --desde main",
+                    'python3 "C:/Users/x/.claude/hooks/monitor_agentes.py" etapa --desde abc123'):
+            self.allowed(cmd)
+        for cmd in ("python otro.py", "python -c print(1)", "python monitor_agentes.py tarea > x.txt"):
+            self.blocked(cmd)
+
+    def test_escribe_el_prompt_log(self):
+        self.assertEqual(guard("architect", "Write", file_path=f"{CWD}/prompt-log/2026-01-01-1200-x.md"), 0)
+        self.assertEqual(guard("architect", "Edit", file_path=f"{CWD}/prompt-log.md"), 2)
+        self.assertEqual(guard("architect", "Write", file_path=f"{CWD}/src/prompt-log-util.py"), 2)
+
     def test_no_afecta_a_los_subagentes(self):
         self.assertEqual(guard("architect", "Bash", agent="software-engineer", command="python -m unittest"), 0)
         self.assertEqual(guard("architect", "Bash", agent="software-architect", command="python -m unittest"), 2)

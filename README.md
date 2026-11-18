@@ -23,6 +23,17 @@ architect ──► tester escribe tests 🔴 ──► engineer implementa 🟢
 | `Ctrl+B` | Pasa la tarea en curso a segundo plano |
 | `Esc` | Interrumpe al agente |
 
+## Monitoreo
+
+`hooks/monitor_agentes.py` mide al equipo sin gastar tokens: lee lo que Claude Code guarda de cada
+subagente y el diff de git. El architect lo corre solo; también se puede correr a mano desde la carpeta
+del proyecto:
+
+| Comando | Cuándo |
+|---|---|
+| `python ~/.claude/hooks/monitor_agentes.py tarea --desde main` | Al cerrar una tarea: alertas de los agentes nuevos (relecturas, bloqueos, vueltas de corrección, archivos fuera del pedido, dependencias, tests de más o cambiados, costo contra la mediana, modelo) |
+| `python ~/.claude/hooks/monitor_agentes.py etapa --desde <commit>` | Al cumplir un objetivo: tokens por agente, tareas más caras y señales repetidas |
+
 ## El equipo
 
 | Agente | Hace | No puede | Modelo |
@@ -39,7 +50,7 @@ Todos siguen [FILOSOFIA.md](FILOSOFIA.md). Cada proyecto puede ajustarla en su `
 |---|---|
 | `FILOSOFIA.md` | Cómo se trabaja: principios, diseño, calidad y seguridad |
 | `agents/` | Un archivo por agente: configuración (modelo, permisos) + prompt |
-| `hooks/` | Scripts automáticos: el guard que impone los límites de cada rol y el formateador del engineer |
+| `hooks/` | Scripts automáticos: el guard que impone los límites de cada rol, el formateador del engineer y el monitoreo del equipo (`monitor_agentes.py`) |
 | `mods/` | Mods de Claude Code (cambios a su interfaz y comportamiento), cada uno con sus tests. Hoy: `context-saver` |
 | `extra/BITACORA.md` | Decisiones, limitaciones y fallas encontradas (lo mantiene la IA) |
 | `extra/INSTALAR.md` | Instrucciones para que una IA instale el equipo |

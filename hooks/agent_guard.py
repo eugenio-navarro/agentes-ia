@@ -35,6 +35,9 @@ GIT_READ_ONLY = {
 }
 GIT_LIST_ONLY = {"branch", "remote", "tag", "stash"}  # allowed only when listing
 VERSION_FLAGS = {"--version", "-v", "-V", "version", "--help", "-h"}
+PYTHONS = {"python", "python3", "py"}
+MONITOR = "monitor_agentes.py"
+
 
 
 def deny(msg):
@@ -78,6 +81,8 @@ def check_segment(seg):
         return "find con -delete/-exec"
     if cmd in READ_ONLY_COMMANDS:
         return None
+    if cmd in PYTHONS and args and os.path.basename(args[0].strip("'\"")) == MONITOR:
+        return None  # el monitoreo del equipo solo lee transcripciones y git
     if args and all(a in VERSION_FLAGS for a in args):
         return None  # e.g. `node --version`, `gradle -v`
     return cmd
@@ -234,7 +239,10 @@ def guard_tester(data):
         check_tester_segment(tokens, cwd)
 
 
-# --- architect: writes only into its own agent memory ---------------------
+# --- architect: writes only into its own agent memory and the prompt log --
+
+LOG_DIR = "prompt-log"  # registro de prompts que piden algunos proyectos; lo escribe el architect
+
 
 def guard_architect_files(data):
     if data.get("tool_name") not in ("Edit", "Write", "NotebookEdit"):
@@ -242,9 +250,14 @@ def guard_architect_files(data):
     ti = data.get("tool_input", {})
     path = ti.get("file_path") or ti.get("notebook_path") or ""
     memory = os.path.normcase(os.path.abspath(os.path.expanduser("~/.claude/agent-memory")))
-    if path and not to_abs(path, data.get("cwd", "")).startswith(memory):
-        deny("Bloqueado: el software-architect no edita archivos (solo su memoria en "
-             "~/.claude/agent-memory/). Delegá el cambio al software-engineer.")
+    if not path:
+        return
+    destino = to_abs(path, data.get("cwd", ""))
+    if destino.startswith(memory) or LOG_DIR in re.split(r"[\\/]", destino.lower())[:-1]:
+        return
+    deny("Bloqueado: el software-architect no edita archivos (solo su memoria en "
+         "~/.claude/agent-memory/ y el registro en prompt-log/). Delegá el cambio al "
+         "software-engineer.")
 
 
 def main():
