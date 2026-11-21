@@ -1,0 +1,9 @@
+{
+  "name": "mapa-agentes",
+  "version": "1.0.0",
+  "description": "Panel lateral con un avatar por agente y subagente: qué tarea tiene, qué herramienta usa ahora y cómo termina, en vivo.",
+  "author": {
+    "name": "Eugenio Navarro"
+  },
+  "types": "./types/index.d.ts"
+}
