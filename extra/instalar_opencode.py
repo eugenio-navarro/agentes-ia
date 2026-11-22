@@ -44,6 +44,9 @@ MODELOS = {
 
 COLORES = {"purple": "#a855f7", "blue": "#3b82f6", "green": "#22c55e"}
 
+# Capacidades sin equivalente en OpenCode: el agente que las usa no se instala.
+SIN_EQUIVALENTE = {"drive"}  # conectores de Google Drive/Docs de claude.ai (software-documenter)
+
 # Comandos de solo lectura del architect (misma lista que hooks/agent_guard.py).
 COMANDOS_LECTURA = [
     "ls", "dir", "cat", "head", "tail", "wc", "pwd", "tree", "grep", "rg",
@@ -490,11 +493,20 @@ def componer_agents_md(destino, bloque):
     return bloque.strip("\n") + "\n"
 
 
+def sin_equivalente(texto):
+    """Capacidades de un agente que OpenCode no tiene (hoy, `drive`: el conector de claude.ai)."""
+    fm, _ = separar(texto)
+    return [t for t in lista(leer_frontmatter(fm.splitlines()).get("tools", "")) if t in SIN_EQUIVALENTE]
+
+
 def plan(destino, modelos):
     """Lista de (ruta destino, contenido nuevo en bytes)."""
     archivos = []
     for agente in sorted((REPO / "agents").glob("*.md")):
-        nombre, texto = traducir(agente.read_text(encoding="utf-8"), modelos)
+        texto_generico = agente.read_text(encoding="utf-8")
+        if sin_equivalente(texto_generico):  # sin esas herramientas el agente no sirve, y
+            continue                          # traducido caería en los permisos del engineer
+        nombre, texto = traducir(texto_generico, modelos)
         archivos.append((destino / "agents" / f"{nombre}.md", texto.encode("utf-8")))
     archivos.append((destino / "FILOSOFIA.md", con_lf(REPO / "FILOSOFIA.md")))
     filosofia = (REPO / "FILOSOFIA.md").read_text(encoding="utf-8").replace("\r\n", "\n")

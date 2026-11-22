@@ -124,6 +124,10 @@ van primero y las especificas despues.
   distintos se usa un worktree creado a mano (`git worktree add <dir> <rama>`).
 - **Mods de Claude Code** (`mods/context-saver`): son de la interfaz de Claude Code y no
   aplican a OpenCode.
+- **`software-documenter`**: no se instala. Usa los conectores de Google Drive y Docs de
+  claude.ai (capacidad `drive`), que OpenCode no tiene; traducido, caería en los permisos del
+  engineer. El architect de OpenCode tampoco puede delegarle (`task` solo permite engineer y
+  tester).
 
 ## Verificar
 
