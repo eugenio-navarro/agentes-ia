@@ -31,9 +31,9 @@ class TraduccionTest(unittest.TestCase):
             nombre, texto = inst.traducir(archivo.read_text(encoding="utf-8"), self.hooks)
             self.agentes[nombre] = (archivo, texto)
 
-    def test_instala_los_tres_agentes_con_su_nombre(self):
-        self.assertEqual(set(self.agentes),
-                         {"software-architect", "software-engineer", "software-tester"})
+    def test_instala_los_cuatro_agentes_con_su_nombre(self):
+        self.assertEqual(set(self.agentes), {"software-architect", "software-engineer",
+                                             "software-tester", "software-documenter"})
 
     def test_el_cuerpo_queda_igual_al_del_repo(self):
         for archivo, texto in self.agentes.values():
@@ -44,13 +44,25 @@ class TraduccionTest(unittest.TestCase):
         modelos = {n: re.search(r"^model: (\w+)$", frontmatter(t), re.M).group(1)
                    for n, (_, t) in self.agentes.items()}
         self.assertEqual(modelos, {"software-architect": "opus", "software-engineer": "sonnet",
-                                   "software-tester": "haiku"})
+                                   "software-tester": "haiku", "software-documenter": "sonnet"})
 
-    def test_el_architect_delega_solo_en_engineer_y_tester(self):
+    def test_el_architect_delega_solo_en_su_equipo(self):
         fm = frontmatter(self.agentes["software-architect"][1])
-        self.assertIn("Agent(software-engineer, software-tester)", fm)
+        self.assertIn("Agent(software-engineer, software-tester, software-documenter)", fm)
         self.assertIn("ToolSearch", fm)
         self.assertNotIn("Edit,", fm)
+
+    def test_el_documenter_lee_el_repo_y_escribe_solo_en_drive(self):
+        linea = re.search(r"^tools: (.*)$", frontmatter(self.agentes["software-documenter"][1]), re.M)
+        assert linea is not None
+        tools = linea.group(1).split(", ")
+        for servidor in ("claude_ai_Google_Drive", "af2aec09-1933-4981-923f-d988ecaeaad4"):
+            self.assertIn(f"mcp__{servidor}__copy_file", tools)
+        for servidor in ("claude_ai_Google_Docs", "242c3fa4-aa6b-4314-9ce8-b9b0e7cb2a0f"):
+            self.assertIn(f"mcp__{servidor}__update_doc", tools)
+        locales = {t for t in tools if not t.startswith("mcp__")}
+        self.assertEqual(locales, {"Read", "Glob", "Grep", "ToolSearch"})
+        self.assertFalse([t for t in tools if t.endswith(("share_file", "trash_file", "__*"))])
 
     def test_hooks_con_ruta_absoluta(self):
         fm = frontmatter(self.agentes["software-tester"][1])
@@ -72,7 +84,7 @@ class InstalacionTest(unittest.TestCase):
             destino = Path(tmp)
             (destino / "CLAUDE.md").write_text("# Mis instrucciones\n\nNo borrar esto.\n", encoding="utf-8")
             instalar_en(destino)
-            self.assertEqual(len(list((destino / "agents").glob("*.md"))), 3)
+            self.assertEqual(len(list((destino / "agents").glob("*.md"))), 4)
             self.assertTrue((destino / "hooks" / "agent_guard.py").exists())
             self.assertFalse((destino / "hooks" / "test_hooks.py").exists())
             for copia in [destino / "FILOSOFIA.md", *(destino / "hooks").glob("*.py")]:

@@ -1,10 +1,10 @@
 # agentes-ia
 
-Equipo de 3 agentes de IA que desarrolla software con **TDD**, en proyectos nuevos o existentes.
+Equipo de 4 agentes de IA que desarrolla software con **TDD**, en proyectos nuevos o existentes.
 Hablás solo con el architect; él coordina al resto.
 
 ```
-architect ──► tester escribe tests 🔴 ──► engineer implementa 🟢 ──► tester verifica ✅
+architect ──► tester escribe tests 🔴 ──► engineer implementa 🟢 ──► tester verifica ✅ ──► documenter documenta 📄
 ```
 
 ## Guía de uso
@@ -41,8 +41,15 @@ del proyecto:
 | **architect** | Entiende el pedido, decide la arquitectura, delega y valida | Editar código | Opus |
 | **engineer** | Implementa hasta que los tests pasen y commitea | Modificar los tests del tester, hacer push | Sonnet |
 | **tester** | Escribe los tests antes del código y verifica después | Tocar código de producción, commitear | Haiku |
+| **documenter** | Al cerrar cada tarea, documenta en Google Drive los archivos que cambiaron, con la estructura de carpetas del proyecto y tus plantillas. Solo si el `CLAUDE.md` del proyecto tiene `## Documentación en Drive` | Modificar el repo, compartir o borrar documentos | Sonnet |
 
 Todos siguen [FILOSOFIA.md](FILOSOFIA.md). Cada proyecto puede ajustarla en su `CLAUDE.md`.
+
+El documenter usa los conectores de Google Drive y Google Docs de claude.ai (tienen que estar conectados
+en la cuenta). El formato de cada documento está en su prompt (`agents/documenter.md`), igual para
+todos los proyectos. En el `CLAUDE.md` de cada proyecto, la sección `## Documentación en Drive` tiene
+lo propio: los links de la carpeta de código, de "Conceptos generales" y de las dos plantillas, y qué
+carpetas del código se documentan.
 
 ## Estructura
 

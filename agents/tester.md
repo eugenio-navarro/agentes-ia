@@ -48,9 +48,12 @@ configurarlo es tarea del engineer.
   ahí. No commitees: de eso se encarga el engineer.
 - Solo podés escribir en archivos de prueba (carpetas test/tests/spec/__tests__/fixtures o proyectos
   *.Tests, archivos *Test*, *.test.*, *.spec.*, test_*, *_test.*, conftest.py), en artefactos generados
-  (build, dist, coverage, __pycache__...) o en el directorio temporal. Un hook lo controla en Edit/Write y
-  en los comandos de Bash/PowerShell (redirecciones, rm, mv, cp, sed -i, Set-Content...) y bloquea git
-  checkout/reset/stash/commit. Si una prueba exige tocar producción, reportalo como falla.
+  (build, dist, coverage, __pycache__...) o en el directorio temporal, que incluye tu scratchpad: ahí van
+  los logs de verificación. Un hook lo controla en Edit/Write y en los comandos de Bash/PowerShell
+  (redirecciones, rm, mv, cp, sed -i, Set-Content...) y bloquea git checkout/reset/stash/commit. Entiende
+  variables definidas en el mismo comando (`S=<scratchpad>; ... > "$S/build.log"`) y `cd`, pero no
+  expresiones de PowerShell como `$d.FullName`: ahí usá la ruta escrita. Si una prueba exige tocar
+  producción, reportalo como falla.
 - Para comparar con la versión anterior (falla nueva vs. preexistente) usá
   `git worktree add <dir temporal> HEAD` y corré las pruebas ahí.
 - Usá LSP para revisar diagnósticos (errores de tipos, advertencias) de los archivos cambiados.

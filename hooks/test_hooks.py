@@ -1,4 +1,5 @@
 """Tests de los hooks. Correr con: python -m unittest discover hooks"""
+import datetime
 import json
 import os
 import subprocess
@@ -55,9 +56,38 @@ class ArchitectGuard(unittest.TestCase):
             self.blocked(cmd)
 
     def test_escribe_el_prompt_log(self):
-        self.assertEqual(guard("architect", "Write", file_path=f"{CWD}/prompt-log/2026-01-01-1200-x.md"), 0)
+        ahora = datetime.datetime.now().strftime("%Y-%m-%d-%H%M")
+        self.assertEqual(guard("architect", "Write", file_path=f"{CWD}/prompt-log/{ahora}-x.md"), 0)
+        self.assertEqual(guard("architect", "Write", file_path=f"{CWD}/prompt-log/notas.md"), 0)
         self.assertEqual(guard("architect", "Edit", file_path=f"{CWD}/prompt-log.md"), 2)
         self.assertEqual(guard("architect", "Write", file_path=f"{CWD}/src/prompt-log-util.py"), 2)
+
+    def test_la_hora_del_prompt_log_es_la_del_reloj(self):
+        def nombre(minutos):
+            hora = datetime.datetime.now() + datetime.timedelta(minutes=minutos)
+            return f"{CWD}/prompt-log/{hora.strftime('%Y-%m-%d-%H%M')}-x.md"
+        self.assertEqual(guard("architect", "Write", file_path=nombre(-4)), 0)
+        self.assertEqual(guard("architect", "Write", file_path=nombre(4)), 0)
+        self.assertEqual(guard("architect", "Write", file_path=nombre(-30)), 2)
+        self.assertEqual(guard("architect", "Write", file_path=nombre(24 * 60)), 2)
+
+    def test_edita_un_prompt_log_existente_de_otra_hora(self):
+        with tempfile.TemporaryDirectory() as d:
+            carpeta = os.path.join(d, "prompt-log")
+            os.mkdir(carpeta)
+            viejo = os.path.join(carpeta, "2026-01-01-1200-x.md")
+            open(viejo, "w").close()
+            self.assertEqual(guard("architect", "Edit", file_path=viejo), 0)
+            self.assertEqual(guard("architect", "Write", file_path=viejo), 0)
+
+    def test_gh_de_solo_lectura(self):
+        for cmd in ("gh pr view 12", "gh pr checks 12 --watch", "gh run view 345 --log",
+                    "gh auth status", "gh --version"):
+            self.allowed(cmd)
+        for cmd in ("gh pr create --fill", "gh pr merge 12", "gh run rerun 345",
+                    "gh auth status --show-token", "gh auth status -t", "gh api repos/x/y",
+                    "gh pr", "gh repo delete x"):
+            self.blocked(cmd)
 
     def test_no_afecta_a_los_subagentes(self):
         self.assertEqual(guard("architect", "Bash", agent="software-engineer", command="python -m unittest"), 0)
@@ -89,6 +119,32 @@ class TesterGuard(unittest.TestCase):
         for cmd in ("echo x > src/main.py", "rm src/main.py", "cp /tmp/x.py src/main.py",
                     "git stash", "git checkout -- src", "sed -i s/a/b/ hooks/agent_guard.py"):
             self.assertEqual(self.bash(cmd), 2, cmd)
+
+    def test_escribe_logs_en_el_scratchpad_con_variables(self):
+        scratch = os.path.join(tempfile.gettempdir(), "claude", "abc", "scratchpad").replace("\\", "/")
+        for cmd in (f'SCR="{scratch}" && mkdir -p "$SCR" && (./gradlew build > "$SCR/build.log" 2>&1)',
+                    f"S={scratch}; rm -rf $S/demo && cp -r src $S/demo/",
+                    f'S={scratch}\n./gradlew test > ${{S}}/demo_b.log 2>&1',
+                    './gradlew clean build 2>&1 | tee "$TMPDIR/build-verif.log" | tail -150',
+                    './gradlew build > "$TMPDIR/build.log" 2>&1',
+                    f'cd "{scratch}/demo" && ./gradlew test > ../demo_a.log 2>&1 && rm -rf fixtures'):
+            self.assertEqual(self.bash(cmd), 0, cmd)
+        ps = f'$S = "{scratch}"; dotnet test > "$S\\test.log"; Set-Content -Path "$S\\r.txt" -Value x'
+        self.assertEqual(guard("tester", "PowerShell", agent="software-tester", command=ps), 0)
+        ps = '$S = "src"; Set-Content -Path "$S\\main.cs" -Value x'
+        self.assertEqual(guard("tester", "PowerShell", agent="software-tester", command=ps), 2)
+
+    def test_una_variable_no_esconde_produccion(self):
+        for cmd in ("M=src/main/kotlin/model\ncat > $M/Temporal.kt <<'EOF'\nx\nEOF",
+                    "echo x > $DESCONOCIDA/main.py", "S=src; rm $S/main.py",
+                    "cd src && echo x > main.py"):
+            self.assertEqual(self.bash(cmd), 2, cmd)
+
+    def test_un_mayor_entre_comillas_no_es_una_redireccion(self):
+        for cmd in ("grep -o '<testsuite [^>]*>' build/test-results/a.xml | head -1",
+                    'grep -E "PASSED|FAILED|BUILD" build/x.log',
+                    "cat > tests/test_a.py <<'EOF'\nif a > b: pass\nEOF"):
+            self.assertEqual(self.bash(cmd), 0, cmd)
 
 
 class FormatOnEdit(unittest.TestCase):

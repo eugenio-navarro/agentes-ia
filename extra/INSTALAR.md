@@ -16,7 +16,7 @@ Si el usuario te pidió instalar estos agentes:
    de sobrescribir. No toques API keys ni otras configuraciones.
 6. Si tu herramienta no soporta algún campo (hooks, memoria, MCP...), omitilo y decile al usuario
    qué capacidad o protección se pierde.
-7. Verificá: `python -m unittest discover hooks` pasa, la herramienta lista los 3 agentes y cada uno
+7. Verificá: `python -m unittest discover hooks` pasa, la herramienta lista los 4 agentes y cada uno
    carga con el modelo esperado. Al final, listá lo instalado y explicá cómo iniciar el architect.
 
 Requisitos: Python 3 en el PATH (hooks) y Node/npx (Playwright del tester).
@@ -28,7 +28,7 @@ Requisitos: Python 3 en el PATH (hooks) y Node/npx (Playwright del tester).
 | `mode` | `principal`: se inicia como agente de la sesión. `subagente`: lo invoca el architect. |
 | `model` | `alto` (razonamiento fuerte), `medio` (código, costo medio), `liviano` (barato). Usá el alias más reciente de cada nivel. |
 | `effort` | Nivel de razonamiento, si la herramienta lo soporta. |
-| `tools` | Capacidades: `read` (leer/buscar), `edit`, `lsp`, `shell`, `web`, `todo`, `ask-user`, `delegate`, `skills`, `browser`. |
+| `tools` | Capacidades: `read` (leer/buscar), `edit`, `lsp`, `shell`, `web`, `todo`, `ask-user`, `delegate`, `skills`, `browser`, `drive` (Google Drive y Docs: buscar, leer, crear carpetas, copiar, mover y editar Docs; sin compartir ni borrar). |
 | `delegates` | Únicos subagentes que puede invocar. |
 | `memory` | Memoria persistente del agente (`user` = compartida entre proyectos). |
 | `guard` | Hook *antes* de cada herramienta: `python hooks/agent_guard.py <rol>`. |
@@ -80,7 +80,12 @@ Si una IA instala a mano, las reglas son estas:
   `read` → `Read, Glob, Grep` · `edit` → `Edit, Write, NotebookEdit` · `lsp` → `LSP` ·
   `shell` → `Bash, PowerShell` · `web` → `WebFetch, WebSearch` · `todo` → `TodoWrite` ·
   `ask-user` → `AskUserQuestion` · `delegate` → `Agent(<delegates separados por coma>), SendMessage` ·
-  `skills` → `Skill` · `browser` → `mcp__playwright__*`.
+  `skills` → `Skill` · `browser` → `mcp__playwright__*` · `drive` → las herramientas de los
+  conectores de Google Drive (`search_files`, `get_file_metadata`, `read_file_content`, `create_file`,
+  `copy_file`, `update_file`) y Google Docs (`read_doc`, `update_doc`) de claude.ai, una por una (sin
+  `__*`, para no dar `share_file` ni `trash_file`). Claude Code nombra cada conector distinto según dónde
+  corre: `mcp__claude_ai_Google_Drive__…` en la terminal y VS Code, y `mcp__<id del conector>__…` en la
+  app de escritorio. Se ponen las dos formas; el id es de cada cuenta (`CONECTORES` en el instalador).
 - `guard: <rol>` → `hooks.PreToolUse` con matcher `"Bash|PowerShell|Edit|Write|NotebookEdit"` y
   `command: python "<ruta absoluta>/agent_guard.py" <rol>`.
 - `post-edit` → `hooks.PostToolUse` con matcher `"Edit|Write"` y

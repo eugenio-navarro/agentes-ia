@@ -6,6 +6,7 @@ Usage (from agent frontmatter hooks):
 
 Exit 0 = allow, exit 2 = block (stderr is shown to the agent).
 """
+import datetime
 import json
 import os
 import re
@@ -35,6 +36,9 @@ GIT_READ_ONLY = {
 }
 GIT_LIST_ONLY = {"branch", "remote", "tag", "stash"}  # allowed only when listing
 VERSION_FLAGS = {"--version", "-v", "-V", "version", "--help", "-h"}
+# gh: solo lo que sirve para revisar un PR y su CI. `--show-token` / `-t` imprimen el token.
+GH_READ_ONLY = {("pr", "view"), ("pr", "checks"), ("run", "view"), ("auth", "status")}
+GH_SECRET_FLAGS = {"--show-token", "-t"}
 PYTHONS = {"python", "python3", "py"}
 MONITOR = "monitor_agentes.py"
 
@@ -76,6 +80,10 @@ def check_segment(seg):
                     for a in rest):
                 return None
         return f"git {sub}".strip()
+    if cmd == "gh" and not (args and all(a in VERSION_FLAGS for a in args)):
+        if tuple(args[:2]) in GH_READ_ONLY and not GH_SECRET_FLAGS & set(args):
+            return None
+        return f"gh {' '.join(args[:2])}".strip()
     if cmd == "find" and any(a in ("-delete", "-exec", "-execdir", "-ok", "-fprint")
                              for a in args):
         return "find con -delete/-exec"
@@ -215,6 +223,91 @@ def check_tester_segment(tokens, cwd):
             deny_tester(t)
 
 
+# The shell parsing below only follows what decides where a command writes: quotes, heredocs,
+# variables assigned in the same command (`S=<scratchpad>; ... > $S/x.log`) and `cd`. A variable
+# it cannot resolve stays as `$NAME`, which is never a test path, so it is blocked.
+HEREDOC = re.compile(r"<<-?[ \t]*(['\"]?)(\w+)\1([^\n]*)\n(?:.*?\n)?[ \t]*\2[ \t]*(?=\n|$)", re.DOTALL)
+VARIABLE = re.compile(r"\$(?:\{(\w+)\}|(\w+))")
+BASH_ASSIGNMENT = re.compile(r"^([A-Za-z_]\w*)=(.*)$", re.DOTALL)
+PS_ASSIGNMENT = re.compile(r"^\s*\$([A-Za-z_]\w*)\s*=\s*(.+?)\s*$", re.DOTALL)
+REDIRECT_TARGET = re.compile(r"(?:\"[^\"]*\"|'[^']*'|[^\s;&|()<>\"'])+")
+CD_COMMANDS = {"cd", "chdir", "pushd", "set-location", "sl", "push-location"}
+TEMP_VARIABLES = ("TMPDIR", "TEMP", "TMP")
+
+
+def scan(text, powershell, on_char):
+    """Walks `text` calling on_char(i, char) for each character outside quotes.
+
+    on_char returns how many characters to skip (0 to continue normally)."""
+    quote, i = None, 0
+    while i < len(text):
+        c = text[i]
+        if quote:
+            if c == quote:
+                quote = None
+            elif c == "\\" and quote == '"' and not powershell:
+                i += 1
+        elif c in "'\"":
+            quote = c
+        elif c == "\\" and not powershell:
+            i += 1
+        else:
+            i += on_char(i, c)
+        i += 1
+
+
+def split_segments(command, powershell):
+    """Splits on `;`, `|`, `&&`, `||` and newlines that are outside quotes."""
+    cuts = []
+
+    def on_char(i, c):
+        if c in ";|\n" or command.startswith("&&", i):
+            cuts.append(i)
+            return 1 if command.startswith(("&&", "||"), i) else 0
+        return 0
+
+    scan(command, powershell, on_char)
+    segments, start = [], 0
+    for cut in cuts:
+        segments.append(command[start:cut])
+        start = cut + (2 if command.startswith(("&&", "||"), cut) else 1)
+    return segments + [command[start:]]
+
+
+def redirect_targets(segment, powershell):
+    """Files written by `>`, `>>` or `2>` outside quotes (not `2>&1`)."""
+    targets = []
+
+    def on_char(i, c):
+        if c != ">":
+            return 0
+        j = i + 1 + (segment[i + 1:i + 2] == ">")
+        if segment[j:j + 1] == "&":
+            return j - i
+        while segment[j:j + 1] in (" ", "\t"):
+            j += 1
+        m = REDIRECT_TARGET.match(segment, j)
+        if not m:
+            return j - i - 1
+        targets.append(re.sub(r"[\"']", "", m.group(0)))
+        return m.end() - i - 1
+
+    scan(segment, powershell, on_char)
+    return targets
+
+
+def expand(text, variables):
+    return VARIABLE.sub(lambda m: variables.get(m.group(1) or m.group(2), m.group(0)), text)
+
+
+def tokenize(segment, powershell):
+    try:
+        tokens = shlex.split(segment, posix=not powershell)
+    except ValueError:
+        tokens = segment.split()
+    return [t.strip("'\"") for t in tokens] if powershell else tokens
+
+
 def guard_tester(data):
     ti = data.get("tool_input", {})
     cwd = data.get("cwd", "")
@@ -225,23 +318,49 @@ def guard_tester(data):
         return
     if data.get("tool_name") not in ("Bash", "PowerShell"):
         return
-    command = ti.get("command", "")
-    # redirections: `> file`, `>> file`, `2> file` (but not `2>&1` / null)
-    for target in re.findall(r"\d?>>?\s*(\"[^\"]+\"|'[^']+'|[^\s;&|]+)", command):
-        if not target.startswith("&") and target.strip("'\"").lower() not in NULL_TARGETS \
-                and not is_test_path(target, cwd):
-            deny_tester(target.strip("'\""))
-    for seg in re.split(r"&&|\|\||[;|\n]", command):
-        try:
-            tokens = shlex.split(seg, posix=True)
-        except ValueError:
-            tokens = seg.split()
+    powershell = data.get("tool_name") == "PowerShell"
+    command = HEREDOC.sub(lambda m: m.group(3), ti.get("command", ""))  # heredoc bodies are data
+    variables = {name: tempfile.gettempdir() for name in TEMP_VARIABLES}
+    for seg in split_segments(command, powershell):
+        assignment = PS_ASSIGNMENT.match(seg) if powershell else None
+        if assignment:
+            variables[assignment.group(1)] = expand(assignment.group(2).strip("'\""), variables)
+            continue
+        for target in redirect_targets(seg, powershell):
+            target = expand(target, variables)
+            if target.lower() not in NULL_TARGETS and not is_test_path(target, cwd):
+                deny_tester(target)
+        tokens = [expand(t, variables) for t in tokenize(seg, powershell)]
+        assignments = [BASH_ASSIGNMENT.match(t) for t in tokens]
+        if tokens and all(assignments):  # `S=dir` alone sets a shell variable
+            variables.update((m.group(1), m.group(2)) for m in assignments if m)
+            continue
+        if len(tokens) > 1 and tokens[0].lower() in CD_COMMANDS:
+            cwd = to_abs(tokens[-1], cwd)
+            continue
         check_tester_segment(tokens, cwd)
 
 
 # --- architect: writes only into its own agent memory and the prompt log --
 
 LOG_DIR = "prompt-log"  # registro de prompts que piden algunos proyectos; lo escribe el architect
+LOG_TIME = re.compile(r"^(\d{4}-\d{2}-\d{2}-\d{4})")  # 2026-11-19-1432-tema.md
+LOG_TOLERANCE = datetime.timedelta(minutes=5)
+
+
+def check_log_time(destino):
+    """A new log carries the real time in its name: the architect used to estimate it."""
+    m = LOG_TIME.match(os.path.basename(destino))
+    if not m or os.path.exists(destino):
+        return
+    now = datetime.datetime.now().replace(second=0, microsecond=0)
+    try:
+        ok = abs(now - datetime.datetime.strptime(m.group(1), "%Y-%m-%d-%H%M")) <= LOG_TOLERANCE
+    except ValueError:
+        ok = False
+    if not ok:
+        deny(f"Bloqueado: la hora del nombre ({m.group(1)}) no coincide con el reloj "
+             f"({now:%Y-%m-%d-%H%M}). No la estimes: corré `date` (o `Get-Date`) y usá esa hora.")
 
 
 def guard_architect_files(data):
@@ -253,7 +372,10 @@ def guard_architect_files(data):
     if not path:
         return
     destino = to_abs(path, data.get("cwd", ""))
-    if destino.startswith(memory) or LOG_DIR in re.split(r"[\\/]", destino.lower())[:-1]:
+    if destino.startswith(memory):
+        return
+    if LOG_DIR in re.split(r"[\\/]", destino.lower())[:-1]:
+        check_log_time(destino)
         return
     deny("Bloqueado: el software-architect no edita archivos (solo su memoria en "
          "~/.claude/agent-memory/ y el registro en prompt-log/). Delegá el cambio al "

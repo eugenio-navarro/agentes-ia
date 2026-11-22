@@ -183,7 +183,8 @@ reglas, los datos, la seguridad y la operación.
 - **Separar quién hace y quién verifica:** el architect define y valida, el tester especifica con pruebas y
   verifica de forma independiente, el engineer implementa. Nadie aprueba su propio trabajo.
 - **Rol visible al delegar:** la descripción de cada tarea delegada empieza con el rol de quien la hace
-  (`ARQ` para el software-architect, `ING` para el software-engineer, `TEST` para el software-tester),
+  (`ARQ` para el software-architect, `ING` para el software-engineer, `TEST` para el software-tester,
+  `DOC` para el software-documenter),
   por ejemplo `ARQ: inicializar el proyecto`, para identificar a cada agente en el mapa de agentes.
 - **El equipo se vigila y se mejora con datos:** el monitoreo (`monitor_agentes.py`) mide cada tarea sin
   gastar tokens. Cada falla se analiza por su causa desde la primera vez: si falta o confunde una

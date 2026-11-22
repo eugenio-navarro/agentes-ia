@@ -35,10 +35,22 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 LINEA_FILOSOFIA = "@~/.claude/FILOSOFIA.md"
 MODELOS = {"alto": "opus", "medio": "sonnet", "liviano": "haiku"}
+# Conectores de Google Drive y Google Docs de claude.ai. Claude Code los nombra distinto según dónde corre:
+# `claude_ai_Google_Drive` en la terminal y VS Code, y con el id del conector en la cuenta en la app de
+# escritorio (se ve en los nombres de herramientas `mcp__<id>__...`). Solo las herramientas que usa el
+# documenter: buscar, leer, crear carpetas, copiar plantillas, mover/renombrar y editar Docs.
+CONECTORES = {
+    "drive": (["claude_ai_Google_Drive", "af2aec09-1933-4981-923f-d988ecaeaad4"],
+              ["search_files", "get_file_metadata", "read_file_content", "create_file", "copy_file",
+               "update_file"]),
+    "docs": (["claude_ai_Google_Docs", "242c3fa4-aa6b-4314-9ce8-b9b0e7cb2a0f"], ["read_doc", "update_doc"]),
+}
 TOOLS = {
     "read": ["Read", "Glob", "Grep"], "edit": ["Edit", "Write", "NotebookEdit"], "lsp": ["LSP"],
     "shell": ["Bash", "PowerShell"], "web": ["WebFetch", "WebSearch"], "todo": ["TodoWrite"],
     "ask-user": ["AskUserQuestion"], "skills": ["Skill"], "browser": ["mcp__playwright__*"],
+    "drive": [f"mcp__{servidor}__{tool}" for servidores, tools in CONECTORES.values()
+              for servidor in servidores for tool in tools],
 }
 EN_WINDOWS = sys.platform == "win32"
 
