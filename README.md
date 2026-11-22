@@ -62,12 +62,16 @@ carpetas del código se documentan.
 | `extra/BITACORA.md` | Decisiones, limitaciones y fallas encontradas (lo mantiene la IA) |
 | `extra/INSTALAR.md` | Instrucciones para que una IA instale el equipo |
 | `extra/instalar_claude_code.py` | Instala o actualiza el equipo en Claude Code (`~/.claude`) a partir del repo |
+| `extra/instalar_opencode.py` | Instala o actualiza el equipo en OpenCode (`~/.config/opencode`) a partir del repo |
+| `extra/OPENCODE.md` | Detalle de la instalación en OpenCode: qué cambia, modelos por nivel y limitaciones |
+| `extra/plugins/agentes-ia-guard.js` | Guard de roles para OpenCode (traduce `hooks/agent_guard.py`) |
 | `extra/setup_nube.sh` | Setup script para usar el equipo en las sesiones en la nube de Claude Code |
 | `extra/configuración_chats_claude_code_app.py` | Hace que los chats de VS Code y de la terminal aparezcan en la barra lateral de la app de escritorio de Claude Code y conserva los chats para que no se borren a los 30 días.
 
 Para instalar o actualizar en Claude Code, desde la raíz del repo: `git pull` y
-`python extra/instalar_claude_code.py` (detalles en `extra/INSTALAR.md`). Para otra herramienta,
-pedile a tu IA: *"Instalá los agentes siguiendo extra/INSTALAR.md"*.
+`python extra/instalar_claude_code.py` (detalles en `extra/INSTALAR.md`). En OpenCode, lo mismo
+con `python extra/instalar_opencode.py` (detalles en `extra/INSTALAR.md` y `extra/OPENCODE.md`).
+Para otra herramienta, pedile a tu IA: *"Instalá los agentes siguiendo extra/INSTALAR.md"*.
 
 ## Mods
 

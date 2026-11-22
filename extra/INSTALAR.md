@@ -99,6 +99,38 @@ Si una IA instala a mano, las reglas son estas:
 
 ## OpenCode
 
+**Instalación automática** (Windows, macOS, Linux; Python 3.8+). Desde la raíz del repo:
+
+```bash
+git pull                                       # traer los últimos cambios
+python extra/instalar_opencode.py --simular    # ver qué cambiaría, sin escribir
+python extra/instalar_opencode.py              # instalar o actualizar en ~/.config/opencode
+```
+
+Aplica las reglas de abajo: regenera los agentes desde `agents/` (el repo es la fuente de verdad),
+los traduce a la configuración de OpenCode (permisos por rol en lugar de hooks), copia `FILOSOFIA.md`
+y lo deja como reglas globales en `AGENTS.md` (sin borrar lo que ya tengas: su bloque va entre
+marcas `<!-- agentes-ia: inicio -->` y `<!-- agentes-ia: fin -->`), copia el plugin
+`extra/plugins/agentes-ia-guard.js` a `~/.config/opencode/plugins/` y crea
+`~/.config/opencode/agent-memory/`. Antes de reemplazar un archivo que cambia, guarda la versión
+anterior en `~/.config/opencode/backups-agentes/<fecha>/`. Es idempotente: si no hay cambios, no
+toca nada. No edita `opencode.jsonc` (puede tener claves y comentarios propios).
+
+En `~/.config/opencode/opencode.jsonc` el usuario define, a mano:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "default_agent": "software-architect",
+  "mcp": { "playwright": { "type": "local", "command": ["npx", "-y", "@playwright/mcp@latest"], "enabled": true } }
+}
+```
+
+El detalle de lo que se tradujo, los modelos por nivel y las limitaciones están en
+`extra/OPENCODE.md`.
+
+Si una IA instala a mano, las reglas son estas:
+
 - Agentes en `~/.config/opencode/agents/<name>.md` (el nombre del agente es el nombre del archivo).
 - Filosofía: en las reglas globales (`~/.config/opencode/AGENTS.md`).
 - `mode`: principal → `primary`, subagente → `subagent`. `model` con formato `proveedor/modelo`
@@ -106,6 +138,9 @@ Si una IA instala a mano, las reglas son estas:
 - Los hooks de Claude Code no aplican: traducí `guard` a `permission`. Architect: `edit: deny`,
   `bash` con `"*": deny` más `allow` para los comandos de lectura (`git status*`, `git diff*`,
   `git log*`, `ls*`...), y `task: allow`. Tester: `edit: ask` (o un plugin equivalente al guard).
+- OpenCode aplica la última regla que coincide: las reglas amplias van primero y las específicas después.
+- `default_agent: "software-architect"` hace que la sesión arranque con el architect (el equipo
+  se habla solo con él).
 
 ## Copilot CLI
 
