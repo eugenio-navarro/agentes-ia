@@ -38,7 +38,7 @@ MODELOS = {"alto": "opus", "medio": "sonnet", "liviano": "haiku"}
 # Conectores de Google Drive y Google Docs de claude.ai. Claude Code los nombra distinto según dónde corre:
 # `claude_ai_Google_Drive` en la terminal y VS Code, y con el id del conector en la cuenta en la app de
 # escritorio (se ve en los nombres de herramientas `mcp__<id>__...`). Solo las herramientas que usa el
-# documenter: buscar, leer, crear carpetas, copiar plantillas, mover/renombrar y editar Docs.
+# documenter: buscar, leer, crear carpetas y Docs (desde HTML), copiar, mover/renombrar y editar Docs.
 CONECTORES = {
     "drive": (["claude_ai_Google_Drive", "af2aec09-1933-4981-923f-d988ecaeaad4"],
               ["search_files", "get_file_metadata", "read_file_content", "create_file", "copy_file",

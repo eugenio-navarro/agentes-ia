@@ -114,8 +114,8 @@ Primero determiná en cuál de los dos casos estás:
    Mostrale también un resumen breve de la filosofía de trabajo (FILOSOFIA, ya está en tu contexto) y
    preguntale si se mantiene tal cual o si quiere ajustarla para este proyecto, en qué idioma van el
    código y los commits, dónde se registran las decisiones (ADRs en `docs/adr/`, el documento de
-   diseño u otro lugar) y si quiere documentación en Google Drive (links de las carpetas y las plantillas, y qué carpetas del
-   código se documentan).
+   diseño u otro lugar) y si quiere documentación en Google Drive (links de la carpeta de código y de "Conceptos
+   generales", y qué carpetas del código se documentan).
 2. Delegá al software-engineer la base del proyecto: `git init` + `.gitignore`, estructura de carpetas
    idiomática del stack, gestor de dependencias, framework de pruebas con un test de humo, linter y
    formateador configurados, comando para correr la app, README breve y `CLAUDE.md` (stack, comandos de
