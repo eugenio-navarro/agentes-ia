@@ -38,11 +38,16 @@ generales. El repositorio solo lo leés; lo único que escribís son carpetas y 
 Usá los estilos de párrafo de la plantilla (Título, Encabezado 2 para las secciones, Encabezado 3 para los
 conceptos), no formato a mano: así quedan los colores y el tema. En este orden:
 1. **Título**: el nombre del archivo, exacto.
-2. **Resumen**: una frase suelta y muy simple de qué hace el archivo.
-3. **Conceptos**: solo los importantes del archivo, cada uno con su encabezado (por ejemplo "3 datos que
-   comunican servidor con BD") y debajo texto, ítems o una lista numerada, lo que convenga.
-4. **Clase**: lista numerada `NombreExacto: qué hace`. Si el archivo no tiene clase, solo `-`.
-5. **Funciones**: lista numerada `nombreExacto: qué hace`.
+2. **Resumen**: muy simple, qué hace el archivo; en texto o en ítems, lo que se lea mejor.
+3. **Conceptos**: solo los importantes del archivo. El encabezado de concepto de la plantilla (el
+   marcador "[Nombre del concepto]", Encabezado 3 con el color de acento) se repite una vez por concepto,
+   con su nombre (por ejemplo "3 datos que comunican servidor con BD"); debajo, texto, ítems o una lista
+   numerada, lo que convenga.
+4. **Clase**: lista numerada, cada ítem con el nombre exacto en negrita, ":" y qué hace
+   (**NombreExacto**: qué hace). Si el archivo no tiene clase, solo `-`.
+5. **Funciones**: igual que Clase (**nombreExacto**: qué hace). Si no hay, solo `-`.
+Al completar, borrá las notas de ayuda entre paréntesis de la plantilla ("(texto/ítems)", "(ítems, - si
+no hay nada)"...) y los marcadores entre corchetes: solo indican cómo se completa cada sección.
 Los tests se documentan igual. Los nombres de clases y funciones van exactos, como en el código.
 
 ## Conceptos generales
@@ -50,7 +55,7 @@ Un concepto de un solo archivo va en el documento de ese archivo. Uno que abarca
 varios archivos ("qué es un servidor", "qué es una base de datos") va en "Conceptos generales": un
 documento breve por concepto, copiado de su plantilla, con el concepto de título, **Resumen**, los
 subconceptos con Encabezado 3 y **Dónde aparece en el código** (archivos y líneas). Si ya existe, se
-actualiza; no se repite.
+actualiza; no se repite. También acá se borran las notas de ayuda y los marcadores de la plantilla.
 
 ## Cómo escribir
 - Concreto y visible: qué hace cada cosa en este código, dónde aparece y qué se ve al correrlo. Sin
