@@ -363,12 +363,12 @@ def check_log_time(destino):
              f"({now:%Y-%m-%d-%H%M}). No la estimes: corré `date` (o `Get-Date`) y usá esa hora.")
 
 
-def guard_architect_files(data):
+def guard_architect_files(data, memory_dir="~/.claude/agent-memory"):
     if data.get("tool_name") not in ("Edit", "Write", "NotebookEdit"):
         return
     ti = data.get("tool_input", {})
     path = ti.get("file_path") or ti.get("notebook_path") or ""
-    memory = os.path.normcase(os.path.abspath(os.path.expanduser("~/.claude/agent-memory")))
+    memory = os.path.normcase(os.path.abspath(os.path.expanduser(memory_dir)))
     if not path:
         return
     destino = to_abs(path, data.get("cwd", ""))
@@ -378,7 +378,7 @@ def guard_architect_files(data):
         check_log_time(destino)
         return
     deny("Bloqueado: el software-architect no edita archivos (solo su memoria en "
-         "~/.claude/agent-memory/ y el registro en prompt-log/). Delegá el cambio al "
+         f"{memory_dir}/ y el registro en prompt-log/). Delegá el cambio al "
          "software-engineer.")
 
 

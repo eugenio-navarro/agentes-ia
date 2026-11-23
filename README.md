@@ -57,20 +57,24 @@ documentan. Cada documento nuevo se crea en una sola llamada, desde HTML con los
 |---|---|
 | `FILOSOFIA.md` | Cómo se trabaja: principios, diseño, calidad y seguridad |
 | `agents/` | Un archivo por agente: configuración (modelo, permisos) + prompt |
-| `hooks/` | Scripts automáticos: el guard que impone los límites de cada rol, el formateador del engineer y el monitoreo del equipo (`monitor_agentes.py`) |
+| `hooks/` | Scripts automáticos: el guard que impone los límites de cada rol, el formateador del engineer, el monitoreo del equipo (`monitor_agentes.py`) y el adaptador de los dos primeros para Codex (`codex_hooks.py`) |
 | `mods/` | Mods de Claude Code (cambios a su interfaz y comportamiento), cada uno con sus tests. Hoy: `context-saver` y `mapa-agentes` |
 | `extra/BITACORA.md` | Decisiones, limitaciones y fallas encontradas (lo mantiene la IA) |
 | `extra/INSTALAR.md` | Instrucciones para que una IA instale el equipo |
 | `extra/instalar_claude_code.py` | Instala o actualiza el equipo en Claude Code (`~/.claude`) a partir del repo |
 | `extra/instalar_opencode.py` | Instala o actualiza el equipo en OpenCode (`~/.config/opencode`) a partir del repo |
 | `extra/OPENCODE.md` | Detalle de la instalación en OpenCode: qué cambia, modelos por nivel y limitaciones |
+| `extra/instalar_codex.py` | Instala o actualiza el equipo en Codex (`~/.codex`) a partir del repo |
+| `extra/CODEX.md` | Detalle de la instalación en Codex: perfiles por rol, hooks, modelos y limitaciones |
 | `extra/plugins/agentes-ia-guard.js` | Guard de roles para OpenCode (traduce `hooks/agent_guard.py`) |
 | `extra/setup_nube.sh` | Setup script para usar el equipo en las sesiones en la nube de Claude Code |
 | `extra/configuración_chats_claude_code_app.py` | Hace que los chats de VS Code y de la terminal aparezcan en la barra lateral de la app de escritorio de Claude Code y conserva los chats para que no se borren a los 30 días.
 
 Para instalar o actualizar en Claude Code, desde la raíz del repo: `git pull` y
 `python extra/instalar_claude_code.py` (detalles en `extra/INSTALAR.md`). En OpenCode, lo mismo
-con `python extra/instalar_opencode.py` (detalles en `extra/INSTALAR.md` y `extra/OPENCODE.md`).
+con `python extra/instalar_opencode.py` (detalles en `extra/INSTALAR.md` y `extra/OPENCODE.md`). En
+Codex, `python extra/instalar_codex.py` y después `codex -p software-architect` (detalles en
+`extra/CODEX.md`).
 Para otra herramienta, pedile a tu IA: *"Instalá los agentes siguiendo extra/INSTALAR.md"*.
 
 ## Mods

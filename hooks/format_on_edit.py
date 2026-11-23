@@ -59,10 +59,23 @@ def main():
         return
     if data.get("agent_type") not in (None, "", "software-engineer"):
         return
-    ti = data.get("tool_input", {})
-    path = ti.get("file_path") or ""
+    path = data.get("tool_input", {}).get("file_path") or ""
+    report(path, format_file(path))
+
+
+def report(path, problems):
+    """Exit 2 with the linter output so the agent fixes it (Claude Code and Codex read stderr)."""
+    if problems:
+        print("El linter del proyecto reportó problemas en "
+              f"{os.path.basename(path)}; corregilos si los causó tu cambio:\n"
+              + "\n".join(problems)[:4000], file=sys.stderr)
+        sys.exit(2)
+
+
+def format_file(path):
+    """Formats `path` with the project's own tools; returns the linter problems (may be empty)."""
     if not path or not os.path.isfile(path):
-        return
+        return []
     root = find_root(path)
     ext = os.path.splitext(path)[1].lower()
     problems = []
@@ -96,12 +109,7 @@ def main():
         code, out = run(["ktlint", "-F", path], root)
         if code:
             problems.append(out)
-
-    if problems:
-        print("El linter del proyecto reportó problemas en "
-              f"{os.path.basename(path)}; corregilos si los causó tu cambio:\n"
-              + "\n".join(problems)[:4000], file=sys.stderr)
-        sys.exit(2)
+    return problems
 
 
 if __name__ == "__main__":

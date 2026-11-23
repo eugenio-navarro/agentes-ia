@@ -142,6 +142,26 @@ Si una IA instala a mano, las reglas son estas:
 - `default_agent: "software-architect"` hace que la sesión arranque con el architect (el equipo
   se habla solo con él).
 
+## Codex
+
+**Instalación automática** (Windows, macOS, Linux; Python 3.11+). Desde la raíz del repo:
+
+```bash
+git pull                                       # traer los últimos cambios
+python extra/instalar_codex.py --simular       # ver qué cambiaría, sin escribir
+python extra/instalar_codex.py                 # instalar o actualizar en ~/.codex
+```
+
+Genera un perfil por rol (`~/.codex/<rol>.config.toml`, se inicia con `codex -p software-architect`),
+el engineer y el tester como subagentes (`~/.codex/agents/*.toml`), las reglas globales en
+`~/.codex/AGENTS.md` (bloque entre marcas, sin borrar lo del usuario) y los hooks
+(`~/.codex/hooks.json` + `hooks/codex_hooks.py`, que aplica las reglas de `agent_guard.py` y
+`format_on_edit.py`). En Windows deja el comando `codex` en `~/.local/bin`. No edita `config.toml`.
+Después de instalar, los hooks nuevos se aprueban una vez con `/hooks` dentro de `codex`.
+
+El detalle, la configuración manual, los modelos por nivel y las limitaciones están en
+`extra/CODEX.md`.
+
 ## Copilot CLI
 
 - Agentes en `~/.copilot/agents/<name>.agent.md`.
