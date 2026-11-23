@@ -112,6 +112,9 @@ class InstalacionTest(unittest.TestCase):
 class ModsTest(unittest.TestCase):
     DESTINO = Path("/x/.claude")
     MOD = "context-saver@claude-mods"
+    # Todos los mods del repo, en el orden de su marketplace (hoy context-saver y mapa-agentes).
+    MODS = [f"{m['name']}@claude-mods" for m in json.loads(
+        (inst.REPO / "mods" / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8"))["plugins"]]
 
     def test_copia_los_mods_sin_sus_tests(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -151,21 +154,21 @@ class ModsTest(unittest.TestCase):
 
     def test_la_primera_vez_registra_el_origen_e_instala_cada_mod(self):
         comandos, _ = self.registrar(origenes=[], instalados=[])
-        self.assertEqual(comandos, [["marketplace", "add", str(self.DESTINO / "mods")],
-                                    ["install", self.MOD]])
+        self.assertEqual(comandos, [["marketplace", "add", str(self.DESTINO / "mods")]]
+                         + [["install", mod] for mod in self.MODS])
 
     def test_si_ya_esta_registrado_solo_actualiza(self):
         origen = {"name": "claude-mods", "path": str(self.DESTINO / "mods")}
-        comandos, _ = self.registrar(origenes=[origen], instalados=[{"id": self.MOD}])
-        self.assertEqual(comandos, [["update", self.MOD]])
+        comandos, _ = self.registrar(origenes=[origen], instalados=[{"id": m} for m in self.MODS])
+        self.assertEqual(comandos, [["update", mod] for mod in self.MODS])
 
     def test_si_el_origen_apuntaba_a_otra_carpeta_lo_reemplaza(self):
         origen = {"name": "claude-mods", "path": "/repo/mods"}
-        comandos, _ = self.registrar(origenes=[origen], instalados=[{"id": self.MOD}])
-        self.assertEqual(comandos, [["uninstall", self.MOD],
-                                    ["marketplace", "remove", "claude-mods"],
-                                    ["marketplace", "add", str(self.DESTINO / "mods")],
-                                    ["install", self.MOD]])
+        comandos, _ = self.registrar(origenes=[origen], instalados=[{"id": m} for m in self.MODS])
+        self.assertEqual(comandos, [["uninstall", mod] for mod in self.MODS]
+                         + [["marketplace", "remove", "claude-mods"],
+                            ["marketplace", "add", str(self.DESTINO / "mods")]]
+                         + [["install", mod] for mod in self.MODS])
 
     def test_simular_no_ejecuta_nada(self):
         comandos, salida = self.registrar(origenes=[], instalados=[], simular=True)
