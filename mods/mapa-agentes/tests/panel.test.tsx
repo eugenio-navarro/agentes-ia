@@ -52,8 +52,8 @@ test('la tarjeta muestra avatar, tarea legible, estado y pasos como tareas corta
     const ui = await $.ui.mount({ ...PANEL, surface })
     expect((await ui.find({ type: 'Text', text: /^ING$/ }))?.text).toBe('ING')
     expect((await ui.find({ type: 'Text', text: /base de datos/ }))?.text).toBe('Preparar la base de datos')
-    expect((await ui.find({ type: 'Text', text: /Trabajando/ }))?.text).toBe('◌ Trabajando')
-    expect((await ui.find({ type: 'Text', text: /0 acciones/ }))?.text).toBe('⏱ 3s · 0 acciones · 0 tokens')
+    expect((await ui.find({ type: 'Text', text: /Trabajando/ }))?.text).toBe('● Trabajando')
+    expect((await ui.find({ type: 'Text', text: /0 acciones/ }))?.text).toBe('3s · 0 acciones · 0 tokens')
     expect((await ui.find({ type: 'Text', text: /Compilar el proyecto/ }))?.text).toBe('Compilar el proyecto')
     expect(await ui.find({ type: 'Text', text: /gradlew/ })).toBe(undefined)
     expect((await ui.find({ type: 'Text', text: /En vivo/ }))?.text).toBe('● En vivo')
@@ -102,8 +102,8 @@ test('al terminar, la tarjeta muestra "Resumen:" con la frase corta del modelo',
   await ui.unmount()
 })
 
-test('los filtros muestran solo lo suyo y limpiar guarda en el historial', async ($, on) => {
-  motor(on)
+test('los filtros muestran solo lo suyo y los terminados pasan solos al historial', async ($, on) => {
+  const reloj = motor(on)
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
   await $.agent.spawn(SPAWN_ING)
   await $.turn.complete(FIN_ING('ok'))
@@ -115,7 +115,8 @@ test('los filtros muestran solo lo suyo y limpiar guarda en el historial', async
   await ui.press({ key: 'filtro-en-curso' })
   expect((await ui.find({ type: 'Text', text: /^ING$/ }))?.text).toBe('ING')
 
-  await ui.press({ key: 'limpiar' })
+  expect(await ui.find({ type: 'Button', text: /Limpiar/ })).toBe(undefined)
+  await reloj.advance(5 * 60_000 + 1000)
   expect(await ui.find({ type: 'Text', text: /^ING$/ })).toBe(undefined)
 
   await ui.press({ key: 'filtro-historial' })
@@ -123,17 +124,32 @@ test('los filtros muestran solo lo suyo y limpiar guarda en el historial', async
   await ui.unmount()
 })
 
-test('cada tarjeta muestra solo las 3 acciones más recientes', async ($, on) => {
-  motor(on)
+test('los pasos se nombran por lo que logran, no por la herramienta', async ($, on) => {
+  const reloj = motor(on)
+  const pedidos: string[] = []
+  on('model.complete', (_, e) => {
+    pedidos.push(e.prompt)
+    return {
+      value: {
+        isAnswered: true,
+        text: 'Revisar el modelo de stock',
+        usage: { input_tokens: 1, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+      },
+    }
+  })
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
-  for (const archivo of ['a.kt', 'b.kt', 'c.kt', 'd.kt', 'e.kt']) {
+  for (const archivo of ['a.kt', 'b.kt', 'c.kt']) {
     await $.tool.call({ tool: 'Read', file_path: `/p/${archivo}` })
   }
+  await $.tool.call({ tool: 'mcp__drive__copy_file', title: 'Plantilla BD' })
+  await reloj.advance(2000)
 
   const ui = await $.ui.mount({ ...PANEL, surface: 'desktop' })
-  expect(await ui.find({ type: 'Text', text: /Leer b\.kt/ })).toBe(undefined)
-  expect((await ui.find({ type: 'Text', text: /Leer c\.kt/ }))?.text).toBe('Leer c.kt')
-  expect((await ui.find({ type: 'Text', text: /Leer e\.kt/ }))?.text).toBe('Leer e.kt')
+  expect((await ui.find({ type: 'Text', text: /stock/ }))?.text).toBe('Revisar el modelo de stock')
+  expect(await ui.find({ type: 'Text', text: /Leer a\.kt/ })).toBe(undefined)
+  // El tramo que sigue abierto muestra lo que está haciendo hasta que se nombre.
+  expect((await ui.find({ type: 'Text', text: /copy_file/ }))?.text).toBe('Usar copy_file')
+  expect(pedidos).toHaveLength(1)
   expect(await ui.find({ type: 'Button', text: /Detalles/ })).toBe(undefined)
   await ui.unmount()
 })
@@ -161,10 +177,10 @@ test('en un panel angosto, la tarjeta pasa a una sola columna y los filtros se a
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ ...PANEL, surface, props: { ...PANEL.props, bodyColumns: 30 } })
     // Sin caja de avatar: el emoji va junto al rol, y el estado en su propia línea.
-    expect((await ui.find({ type: 'Text', text: /^🔨 ING$/u }))?.text).toBe('🔨 ING')
-    expect((await ui.find({ type: 'Text', text: /Trabajando/ }))?.text).toBe('◌ Trabajando')
-    expect((await ui.find({ type: 'Button', text: /^👥/u }))?.text).toBe('👥 1')
-    expect((await ui.find({ type: 'Text', text: /tok$/ }))?.text).toBe('⏱ 0s · 0 tok')
+    expect((await ui.find({ type: 'Text', text: /^ING$/ }))?.text).toBe('ING')
+    expect((await ui.find({ type: 'Text', text: /Trabajando/ }))?.text).toBe('● Trabajando')
+    expect((await ui.find({ type: 'Button', text: /^T 1$/ }))?.text).toBe('T 1')
+    expect((await ui.find({ type: 'Text', text: /tok$/ }))?.text).toBe('0s · 0 tok')
     await ui.unmount()
   }
 })

@@ -11,6 +11,33 @@ export type Accion = {
   inicio: number
   fin?: number
   fallo?: boolean
+  /** El tramo al que pertenece. */
+  tramoId?: string
+}
+
+/**
+ * Acciones seguidas de la misma herramienta, contadas como un solo paso.
+ * Al cerrarse, un modelo chico lo nombra por lo que logra ("Copiar la plantilla a Drive").
+ */
+export type Tramo = {
+  id: string
+  herramienta: string
+  /** Texto provisorio: la última acción contada por las reglas ("Usar copy_file"). */
+  texto: string
+  cantidad: number
+  inicio: number
+  fin?: number
+  fallo?: boolean
+  /** Ya no suma acciones: lo siguiente que haga el agente abre otro tramo. */
+  cerrado?: boolean
+  /** Lo que dijo el agente justo antes de empezarlo. */
+  contexto?: string
+  /** Cada acción con sus datos, para que el modelo chico lo nombre (se borra al nombrarlo). */
+  detalles: string[]
+  /** El paso nombrado por lo que logra. */
+  nombre?: string
+  /** Falta pedirle el nombre al modelo chico. */
+  nombrePendiente?: boolean
 }
 
 export type EstadoPaso = 'pendiente' | 'en-curso' | 'hecho'
@@ -32,7 +59,10 @@ export type Agente = {
   /** Su lista de tareas, si escribió una. */
   plan: PasoPlan[]
   enCurso: Accion[]
-  recientes: Accion[]
+  /** Sus últimos tramos de trabajo, el más viejo primero. */
+  tramos: Tramo[]
+  /** Lo último que dijo el agente (contexto para nombrar el tramo siguiente). */
+  narracion?: string
   totalAcciones: number
   /** Tokens usados en todos sus pedidos al modelo. */
   tokens: number

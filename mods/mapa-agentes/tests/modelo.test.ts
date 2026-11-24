@@ -2,8 +2,17 @@ import { describe, expect, test } from 'claude-code/testing'
 
 import {
   ID_PRINCIPAL,
-  archivarTerminados,
-  avatarDe,
+  anotarNarracion,
+  detalleDeAccion,
+  guardarNombreTramo,
+  marcarTramoPedido,
+  pedidoDeNombreTramo,
+  siguienteTramoSinNombre,
+  ESPERA_ARCHIVO_MS,
+  archivarViejos,
+  hayParaArchivar,
+  nombrarPrincipal,
+  rolDe,
   comoArbol,
   contar,
   describirAccion,
@@ -40,7 +49,7 @@ describe('ciclo de vida de un subagente', () => {
     expect(lista.some(a => a.id === ID_PRINCIPAL)).toBe(true)
   })
 
-  test('una acción en curso pasa a recientes al terminar, marcando el fallo', async () => {
+  test('una acción termina marcando el fallo en su tramo', async () => {
     let lista = registrarSpawn([], spawnIng, 0)
     lista = iniciarAccion(lista, 'ing-1', { id: 't1', herramienta: 'Bash', texto: 'Compilar', inicio: 10 })
     expect(lista.find(a => a.id === 'ing-1')?.enCurso.length).toBe(1)
@@ -48,20 +57,9 @@ describe('ciclo de vida de un subagente', () => {
     lista = terminarAccion(lista, 'ing-1', 't1', true, 40)
     const ing = lista.find(a => a.id === 'ing-1')
     expect(ing?.enCurso.length).toBe(0)
-    expect(ing?.recientes[0]?.fallo).toBe(true)
-    expect(ing?.recientes[0]?.fin).toBe(40)
+    expect(ing?.tramos[0]?.fallo).toBe(true)
+    expect(ing?.tramos[0]?.fin).toBe(40)
     expect(ing?.totalAcciones).toBe(1)
-  })
-
-  test('se guardan las 3 acciones más recientes, la última primero', async () => {
-    let lista = registrarSpawn([], spawnIng, 0)
-    for (let n = 1; n <= 17; n++) {
-      lista = iniciarAccion(lista, 'ing-1', { id: `t${n}`, herramienta: 'Read', texto: '', inicio: n })
-      lista = terminarAccion(lista, 'ing-1', `t${n}`, false, n)
-    }
-    const ing = lista.find(a => a.id === 'ing-1')
-    expect(ing?.recientes.map(a => a.id)).toEqual(['t17', 't16', 't15'])
-    expect(ing?.totalAcciones).toBe(17)
   })
 
   test('los tokens de cada pedido al modelo se suman al agente que lo hizo', async () => {
@@ -92,6 +90,83 @@ describe('ciclo de vida de un subagente', () => {
     const principal = lista.find(a => a.id === ID_PRINCIPAL)
     expect(principal?.estado).toBe('en-espera')
     expect(principal?.resumenPendiente).toBe(false)
+  })
+})
+
+describe('tramos (pasos nombrados por lo que logran)', () => {
+  const accion = (id: string, herramienta: string, extra: Record<string, unknown> = {}) => ({
+    id,
+    herramienta,
+    texto: describirAccion(herramienta, extra),
+    inicio: 0,
+    detalle: detalleDeAccion(herramienta, extra),
+  })
+  const tramosDe = (lista: ReturnType<typeof registrarSpawn>) => lista.find(a => a.id === 'ing-1')?.tramos ?? []
+
+  test('las acciones seguidas de la misma herramienta forman un solo tramo', async () => {
+    let lista = registrarSpawn([], spawnIng, 0)
+    for (const id of ['a', 'b', 'c']) lista = iniciarAccion(lista, 'ing-1', accion(id, 'mcp__drive__copy_file'))
+    expect(tramosDe(lista).map(t => t.cantidad)).toEqual([3])
+    expect(tramosDe(lista)[0]?.nombrePendiente).toBe(undefined)
+  })
+
+  test('otra herramienta cierra el tramo anterior y lo deja esperando su nombre', async () => {
+    let lista = registrarSpawn([], spawnIng, 0)
+    lista = iniciarAccion(lista, 'ing-1', accion('a', 'Read', { file_path: '/p/a.kt' }))
+    lista = iniciarAccion(lista, 'ing-1', accion('b', 'Edit', { file_path: '/p/a.kt' }))
+    const [leer, editar] = tramosDe(lista)
+    expect(leer?.cerrado).toBe(true)
+    expect(leer?.nombrePendiente).toBe(true)
+    expect(editar?.cerrado).toBe(undefined)
+  })
+
+  test('un tramo junta como mucho 5 acciones', async () => {
+    let lista = registrarSpawn([], spawnIng, 0)
+    for (let n = 1; n <= 7; n++) lista = iniciarAccion(lista, 'ing-1', accion(`t${n}`, 'Read'))
+    expect(tramosDe(lista).map(t => t.cantidad)).toEqual([5, 2])
+  })
+
+  test('se guardan los 3 tramos más recientes, el más viejo primero', async () => {
+    let lista = registrarSpawn([], spawnIng, 0)
+    const herramientas = ['Read', 'Edit', 'Bash', 'Grep', 'Write']
+    herramientas.forEach((h, n) => (lista = iniciarAccion(lista, 'ing-1', accion(`t${n}`, h))))
+    expect(tramosDe(lista).map(t => t.herramienta)).toEqual(['Bash', 'Grep', 'Write'])
+  })
+
+  test('el fin del turno cierra el último tramo', async () => {
+    let lista = iniciarAccion(registrarSpawn([], spawnIng, 0), 'ing-1', accion('a', 'Read'))
+    lista = terminarTurno(lista, 'ing-1', 'answer', 'ok', 5)
+    expect(tramosDe(lista)[0]?.nombrePendiente).toBe(true)
+  })
+
+  test('el pedido de nombre lleva la tarea, lo que dijo el agente y los datos de cada acción', async () => {
+    let lista = anotarNarracion(registrarSpawn([], spawnIng, 0), 'ing-1', 'Copio la plantilla a la carpeta del proyecto.')
+    lista = iniciarAccion(lista, 'ing-1', accion('a', 'mcp__drive__copy_file', { title: 'Plantilla BD', fileId: 'x1' }))
+    lista = terminarTurno(lista, 'ing-1', 'answer', 'ok', 5)
+
+    const siguiente = siguienteTramoSinNombre(lista)
+    expect(siguiente?.tramo.id).toBe('a')
+    const pedido = pedidoDeNombreTramo(siguiente!.agente, siguiente!.tramo)
+    expect(pedido).toContain('Base de datos')
+    expect(pedido).toContain('Copio la plantilla')
+    expect(pedido).toContain('Plantilla BD')
+  })
+
+  test('el nombre se guarda limpio, una sola vez, y libera los datos de las acciones', async () => {
+    let lista = terminarTurno(iniciarAccion(registrarSpawn([], spawnIng, 0), 'ing-1', accion('a', 'Read')), 'ing-1', 'answer', 'ok', 5)
+    lista = marcarTramoPedido(lista, 'ing-1', 'a')
+    expect(siguienteTramoSinNombre(lista)).toBe(undefined)
+
+    lista = guardarNombreTramo(lista, 'ing-1', 'a', '"Revisar el modelo de stock."')
+    expect(tramosDe(lista)[0]?.nombre).toBe('Revisar el modelo de stock')
+    expect(tramosDe(lista)[0]?.detalles).toEqual([])
+  })
+
+  test('los datos de una acción se acortan y omiten lo vacío', async () => {
+    const detalle = detalleDeAccion('Write', { file_path: '/p/README.md', content: 'x'.repeat(500), vacio: '' })
+    expect(detalle).toContain('README.md')
+    expect(detalle).not.toContain('vacio')
+    expect(detalle.length).toBeLessThanOrEqual(200)
   })
 })
 
@@ -159,11 +234,19 @@ describe('filtros e historial', () => {
     expect(contar(lista)).toEqual({ todos: 2, 'en-curso': 1, terminados: 1, historial: 0 })
   })
 
-  test('limpiar mueve los terminados al historial en vez de borrarlos', async () => {
-    const lista = archivarTerminados(armar())
-    expect(filtrar(lista, 'todos').map(a => a.id)).toEqual([ID_PRINCIPAL, 'test-1'])
-    expect(filtrar(lista, 'historial').map(a => a.id)).toEqual(['ing-1'])
-    expect(lista.find(a => a.id === 'ing-1')?.recientes).toEqual([])
+  test('un terminado pasa solo al historial cuando pasó un rato, sin borrarse', async () => {
+    const lista = armar()
+    expect(hayParaArchivar(lista, 9 + ESPERA_ARCHIVO_MS - 1)).toBe(false)
+    expect(hayParaArchivar(lista, 9 + ESPERA_ARCHIVO_MS)).toBe(true)
+
+    const archivada = archivarViejos(lista, 9 + ESPERA_ARCHIVO_MS)
+    expect(filtrar(archivada, 'todos').map(a => a.id)).toEqual([ID_PRINCIPAL, 'test-1'])
+    expect(filtrar(archivada, 'historial').map(a => a.id)).toEqual(['ing-1'])
+  })
+
+  test('el principal nunca pasa al historial', async () => {
+    const lista = terminarTurno(iniciarTurno([], undefined, 0), undefined, 'answer', 'ok', 1)
+    expect(hayParaArchivar(lista, 1 + ESPERA_ARCHIVO_MS * 10)).toBe(false)
   })
 
   test('tocar el filtro activo vuelve a todos', async () => {
@@ -202,9 +285,19 @@ describe('textos para el panel', () => {
     expect(comoArbol(lista).map(f => `${f.profundidad}:${f.agente.id}`)).toEqual([`0:${ID_PRINCIPAL}`, '1:arq', '2:ing-1'])
   })
 
-  test('el avatar sale del prefijo de la tarea o del tipo', async () => {
-    expect(avatarDe({ id: 'x', tipo: 'general-purpose', descripcion: 'ING T7: algo' }).rol).toBe('ING')
-    expect(avatarDe({ id: 'x', tipo: 'otro-tipo', descripcion: '' })).toEqual({ emoji: '🤖', rol: 'otro-tipo' })
+  test('el rol sale del prefijo de la tarea o del tipo', async () => {
+    expect(rolDe({ id: 'x', tipo: 'general-purpose', descripcion: 'ING T7: algo' })).toBe('ING')
+    expect(rolDe({ id: 'x', tipo: 'general-purpose', descripcion: 'DOC T14: algo' })).toBe('DOC')
+    expect(rolDe({ id: 'x', tipo: 'otro-tipo', descripcion: '' })).toBe('otro-tipo')
+  })
+
+  test('si la sesión corre como el architect, el principal se muestra como ARQ', async () => {
+    const comoClaude = iniciarTurno([], undefined, 0)
+    expect(rolDe(comoClaude.find(a => a.id === ID_PRINCIPAL)!)).toBe('Claude')
+
+    const comoArq = nombrarPrincipal(comoClaude, 'software-architect', 1)
+    expect(rolDe(comoArq.find(a => a.id === ID_PRINCIPAL)!)).toBe('ARQ')
+    expect(nombrarPrincipal(comoArq, 'software-architect', 2)).toEqual(comoArq)
   })
 
   test('las duraciones y los tokens se leen cortos', async () => {

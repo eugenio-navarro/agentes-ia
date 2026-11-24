@@ -1,11 +1,14 @@
 // Modelo del mapa de agentes: funciones puras, sin $ ni dibujo.
 // Cada función recibe la lista actual y devuelve una lista nueva (inmutable).
 
-import type { Accion, Agente, EstadoAgente, EstadoPaso, Filtro, PasoPlan } from '../types'
+import type { Accion, Agente, EstadoAgente, EstadoPaso, Filtro, PasoPlan, Tramo } from '../types'
 
 export const ID_PRINCIPAL = 'principal'
 const MAX_AGENTES = 80
-const MAX_RECIENTES = 3
+const MAX_TRAMOS = 3
+const MAX_POR_TRAMO = 5
+const MAX_DETALLE = 200
+const MAX_VALOR = 60
 const MAX_RESPUESTA = 800
 const MAX_TEXTO = 48
 
@@ -21,7 +24,7 @@ function agenteNuevo(id: string, ahora: number, datos: Partial<Agente> = {}): Ag
     inicio: ahora,
     plan: [],
     enCurso: [],
-    recientes: [],
+    tramos: [],
     totalAcciones: 0,
     tokens: 0,
     ...datos,
@@ -115,11 +118,20 @@ export function terminarTurno(
     estado: estadoAlTerminar(id === ID_PRINCIPAL, motivo),
     fin: ahora,
     enCurso: [],
+    tramos: cerrarUltimo(a.tramos ?? []),
     resumen: primeraLinea(limpia) ?? a.resumen,
     respuesta: limpia === '' ? a.respuesta : limpia.slice(0, MAX_RESPUESTA),
     resumenCorto: limpia === '' ? a.resumenCorto : undefined,
     resumenPendiente: id !== ID_PRINCIPAL && limpia !== '',
   }))
+}
+
+/** La sesión corre como un agente (por ejemplo, el architect): el principal se muestra con ese rol. */
+export function nombrarPrincipal(lista: readonly Agente[], tipo: string | undefined, ahora: number): Agente[] {
+  const nuevo = tipo ?? 'principal'
+  const actual = lista.find(a => a.id === ID_PRINCIPAL)
+  if (actual?.tipo === nuevo) return [...lista]
+  return conAgente(lista, ID_PRINCIPAL, ahora, a => ({ ...a, tipo: nuevo }))
 }
 
 // ---------- Resumen corto ----------
@@ -247,15 +259,59 @@ export function actualizarPlan(
   }))
 }
 
-// ---------- Acciones (llamadas a herramientas) ----------
+// ---------- Acciones y tramos ----------
 
-export function iniciarAccion(lista: readonly Agente[], agentId: string | undefined, accion: Accion): Agente[] {
-  return conAgente(lista, idDe(agentId), accion.inicio, a => ({
-    ...a,
-    estado: 'trabajando',
-    enCurso: [...a.enCurso, accion],
-    totalAcciones: a.totalAcciones + 1,
-  }))
+/** Una acción que empieza, con sus datos legibles para nombrar el tramo. */
+export type AccionNueva = Accion & { detalle?: string }
+
+export function iniciarAccion(lista: readonly Agente[], agentId: string | undefined, nueva: AccionNueva): Agente[] {
+  const { detalle, ...accion } = nueva
+  return conAgente(lista, idDe(agentId), accion.inicio, a => {
+    const tramos = sumarAlTramo(a.tramos ?? [], accion, detalle ?? accion.texto, a.narracion)
+    const tramoId = tramos[tramos.length - 1]?.id
+    return {
+      ...a,
+      estado: 'trabajando',
+      enCurso: [...a.enCurso, { ...accion, tramoId }],
+      tramos,
+      narracion: undefined,
+      totalAcciones: a.totalAcciones + 1,
+    }
+  })
+}
+
+/** Suma la acción al tramo abierto si es de la misma herramienta y entra; si no, abre otro. */
+function sumarAlTramo(tramos: readonly Tramo[], accion: Accion, detalle: string, contexto: string | undefined): Tramo[] {
+  const ultimo = tramos[tramos.length - 1]
+  const entra =
+    ultimo !== undefined && ultimo.cerrado !== true && ultimo.herramienta === accion.herramienta && ultimo.cantidad < MAX_POR_TRAMO
+  if (entra) {
+    const crecido: Tramo = {
+      ...ultimo,
+      texto: accion.texto,
+      cantidad: ultimo.cantidad + 1,
+      fin: undefined,
+      detalles: [...ultimo.detalles, detalle],
+    }
+    return [...tramos.slice(0, -1), crecido]
+  }
+  const nuevo: Tramo = {
+    id: accion.id,
+    herramienta: accion.herramienta,
+    texto: accion.texto,
+    cantidad: 1,
+    inicio: accion.inicio,
+    contexto,
+    detalles: [detalle],
+  }
+  return [...cerrarUltimo(tramos), nuevo].slice(-MAX_TRAMOS)
+}
+
+/** Cierra el último tramo abierto y lo deja esperando su nombre. */
+function cerrarUltimo(tramos: readonly Tramo[]): Tramo[] {
+  const ultimo = tramos[tramos.length - 1]
+  if (ultimo === undefined || ultimo.cerrado === true) return [...tramos]
+  return [...tramos.slice(0, -1), { ...ultimo, cerrado: true, nombrePendiente: true }]
 }
 
 export function terminarAccion(
@@ -268,13 +324,69 @@ export function terminarAccion(
   return conAgente(lista, idDe(agentId), ahora, a => {
     const accion = a.enCurso.find(x => x.id === accionId)
     if (accion === undefined) return a
-    const terminada: Accion = { ...accion, fin: ahora, fallo }
     return {
       ...a,
       enCurso: a.enCurso.filter(x => x.id !== accionId),
-      recientes: [terminada, ...a.recientes].slice(0, MAX_RECIENTES),
+      tramos: (a.tramos ?? []).map(t =>
+        t.id === accion.tramoId ? { ...t, fin: ahora, fallo: t.fallo === true || fallo } : t,
+      ),
     }
   })
+}
+
+/** Guarda lo que dijo el agente en su último pedido al modelo: es el contexto del tramo que sigue. */
+export function anotarNarracion(lista: readonly Agente[], agentId: string | undefined, texto: string): Agente[] {
+  const linea = primeraLinea(texto)
+  if (linea === undefined) return [...lista]
+  return conAgente(lista, idDe(agentId), 0, a => ({ ...a, narracion: linea }))
+}
+
+/** Los datos de una acción en una línea corta: qué hizo y con qué ("Usar copy_file — title: Plantilla BD"). */
+export function detalleDeAccion(herramienta: string, args: Record<string, unknown>): string {
+  const datos = Object.entries(args)
+    .filter(([, valor]) => (typeof valor === 'string' && valor.trim() !== '') || typeof valor === 'number')
+    .map(([clave, valor]) => `${clave}: ${String(valor).replace(/\s+/g, ' ').slice(0, MAX_VALOR)}`)
+    .join(', ')
+  const linea = datos === '' ? describirAccion(herramienta, args) : `${describirAccion(herramienta, args)} — ${datos}`
+  return linea.slice(0, MAX_DETALLE)
+}
+
+/** El próximo tramo cerrado al que hay que pedirle el nombre, con su agente. */
+export function siguienteTramoSinNombre(lista: readonly Agente[]): { agente: Agente; tramo: Tramo } | undefined {
+  for (const agente of lista) {
+    const tramo = (agente.tramos ?? []).find(t => t.nombrePendiente === true)
+    if (tramo !== undefined) return { agente, tramo }
+  }
+  return undefined
+}
+
+const conTramo = (lista: readonly Agente[], agenteId: string, tramoId: string, cambio: (t: Tramo) => Tramo) =>
+  lista.map(a => (a.id !== agenteId ? a : { ...a, tramos: (a.tramos ?? []).map(t => (t.id === tramoId ? cambio(t) : t)) }))
+
+export function marcarTramoPedido(lista: readonly Agente[], agenteId: string, tramoId: string): Agente[] {
+  return conTramo(lista, agenteId, tramoId, t => ({ ...t, nombrePendiente: false }))
+}
+
+export function guardarNombreTramo(lista: readonly Agente[], agenteId: string, tramoId: string, texto: string): Agente[] {
+  const nombre = limpiarFrase(texto)
+  return conTramo(lista, agenteId, tramoId, t => ({ ...t, nombre: nombre === '' ? t.nombre : nombre, detalles: [] }))
+}
+
+/** Lo que se le pide al modelo chico para nombrar un tramo por lo que logra. */
+export function pedidoDeNombreTramo(agente: Agente, tramo: Tramo): string {
+  const tarea = agente.id === ID_PRINCIPAL ? 'Conversación principal con el usuario' : tareaLegible(agente.descripcion)
+  return [
+    'Nombrá en español este tramo de trabajo de un agente, como un ítem de una lista de tareas.',
+    'Reglas: de 3 a 7 palabras, en infinitivo, orientado a lo que logra o para qué sirve, no a la herramienta.',
+    'Sin comillas ni punto final. Nunca nombres la herramienta ("Usar copy_file", "Ejecutar un comando").',
+    'Ejemplos: "Copiar la plantilla de la BD a Drive" · "Registrar el prompt en la bitácora" · "Verificar que compile".',
+    'Respondé solo la frase.',
+    '',
+    `Tarea del agente: ${tarea}`,
+    ...(tramo.contexto !== undefined ? [`Lo que dijo el agente antes: ${tramo.contexto}`] : []),
+    'Acciones del tramo:',
+    ...tramo.detalles.map(d => `- ${d}`),
+  ].join('\n')
 }
 
 /** Suma los tokens de un pedido al modelo hecho por el agente. */
@@ -297,9 +409,18 @@ export function tokensDeUso(uso: {
 
 const esTerminado = (a: Agente) => a.id !== ID_PRINCIPAL && a.estado !== 'trabajando'
 
-/** Mueve al historial los subagentes que ya no trabajan; el principal nunca se archiva. */
-export function archivarTerminados(lista: readonly Agente[]): Agente[] {
-  return lista.map(a => (esTerminado(a) && a.archivado !== true ? { ...a, archivado: true } : a))
+/** Cuánto queda a la vista un subagente terminado antes de pasar solo al historial. */
+export const ESPERA_ARCHIVO_MS = 5 * 60_000
+
+const paraArchivar = (a: Agente, ahora: number) =>
+  esTerminado(a) && a.archivado !== true && a.fin !== undefined && ahora - a.fin >= ESPERA_ARCHIVO_MS
+
+/** Hay algún subagente terminado hace rato que todavía no pasó al historial. */
+export const hayParaArchivar = (lista: readonly Agente[], ahora: number) => lista.some(a => paraArchivar(a, ahora))
+
+/** Mueve al historial los subagentes terminados hace rato; el principal nunca se archiva. */
+export function archivarViejos(lista: readonly Agente[], ahora: number): Agente[] {
+  return lista.map(a => (paraArchivar(a, ahora) ? { ...a, archivado: true } : a))
 }
 
 /** Los agentes que muestra cada filtro. */
@@ -354,25 +475,25 @@ export function comoArbol(lista: readonly Agente[]): Fila[] {
   return filas
 }
 
-export type Avatar = { emoji: string; rol: string }
+const ROLES: Record<string, string> = {
+  ARQ: 'ARQ',
+  'software-architect': 'ARQ',
+  ING: 'ING',
+  'software-engineer': 'ING',
+  TEST: 'TEST',
+  'software-tester': 'TEST',
+  DOC: 'DOC',
+  'software-documenter': 'DOC',
+  Explore: 'Explorar',
+  Plan: 'Plan',
+  fork: 'Fork',
+}
 
-/** El avatar sale del prefijo de la tarea (ARQ/ING/TEST) o del tipo de agente. */
-export function avatarDe(agente: Pick<Agente, 'id' | 'tipo' | 'descripcion'>): Avatar {
-  if (agente.id === ID_PRINCIPAL) return { emoji: '🧠', rol: 'Claude' }
-  const prefijo = /^(ARQ|ING|TEST)\b/i.exec(agente.descripcion)?.[1]?.toUpperCase()
-  const clave = prefijo ?? agente.tipo
-  const avatares: Record<string, Avatar> = {
-    ARQ: { emoji: '🧭', rol: 'ARQ' },
-    'software-architect': { emoji: '🧭', rol: 'ARQ' },
-    ING: { emoji: '🔨', rol: 'ING' },
-    'software-engineer': { emoji: '🔨', rol: 'ING' },
-    TEST: { emoji: '🧪', rol: 'TEST' },
-    'software-tester': { emoji: '🧪', rol: 'TEST' },
-    Explore: { emoji: '🔎', rol: 'Explorar' },
-    Plan: { emoji: '📐', rol: 'Plan' },
-    fork: { emoji: '🌿', rol: 'Fork' },
-  }
-  return avatares[clave] ?? { emoji: '🤖', rol: agente.tipo }
+/** El rol que se muestra: el prefijo de la tarea (ARQ/ING/TEST/DOC) o el tipo de agente. */
+export function rolDe(agente: Pick<Agente, 'id' | 'tipo' | 'descripcion'>): string {
+  if (agente.id === ID_PRINCIPAL) return ROLES[agente.tipo] ?? (agente.tipo === 'principal' ? 'Claude' : agente.tipo)
+  const prefijo = /^(ARQ|ING|TEST|DOC)\b/i.exec(agente.descripcion)?.[1]?.toUpperCase()
+  return ROLES[prefijo ?? agente.tipo] ?? agente.tipo
 }
 
 /** Nombre corto de la herramienta: `mcp__servidor__accion` se muestra como `accion`. */
@@ -438,7 +559,7 @@ function fraseDeComando(comando: string): string {
 
 /** La tarea sin el código del rol ("ING T7: preparar…" → "Preparar…"). */
 export function tareaLegible(descripcion: string): string {
-  const sinPrefijo = descripcion.replace(/^\s*(ARQ|ING|TEST)(\s+T?\d+)?\s*[:\-–]\s*/i, '').trim()
+  const sinPrefijo = descripcion.replace(/^\s*(ARQ|ING|TEST|DOC)(\s+T?\d+)?\s*[:\-–]\s*/i, '').trim()
   return acortar(sinPrefijo.charAt(0).toUpperCase() + sinPrefijo.slice(1))
 }
 
