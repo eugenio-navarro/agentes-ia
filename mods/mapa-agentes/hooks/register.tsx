@@ -184,12 +184,10 @@ export const register: Register = on => {
   on('command.run', { command: 'agentes' }, async $ => {
     const abierto = (await $.ui.panes()).some(p => p.id === PANEL)
     await recordarCerrado($, abierto)
-    if (abierto) {
-      await $.ui.close({ id: PANEL })
-      return { text: 'Mapa de agentes cerrado. /agentes lo vuelve a abrir.' }
-    }
-    await $.ui.open({ id: PANEL, title: TITULO })
-    return { text: 'Mapa de agentes abierto. /agentes lo cierra.' }
+    // Sin mensaje en la conversación: el panel que aparece o desaparece ya lo dice.
+    if (abierto) await $.ui.close({ id: PANEL })
+    else await $.ui.open({ id: PANEL, title: TITULO })
+    return {}
   })
 
   // Cerrarlo a mano también se recuerda; el cierre pasa primero, guardar nunca lo frena.
