@@ -100,9 +100,19 @@ class SenalesDeGit(unittest.TestCase):
         red = self.head()
         self.escribir("build.gradle.kts", "plugins {}\ndependencies { implementation(\"x:y:1\") }\n")
         self.escribir("src/main/kotlin/A.kt", "val a = 1\n" * 20)
-        self.escribir("src/test/kotlin/ATest.kt", "class ATest\n" + "// caso\n" * 70)
+        self.escribir("src/test/kotlin/ATest.kt", "class ATest\n" + "val caso = 1\n" * 70)
         claves = {c for c, _ in m.senales_git(desde=red, red=red)}
         self.assertEqual(claves, {"dependencias", "tests_grandes", "test_cambiado"})
+
+    def test_comentarios_en_un_test_no_son_un_test_cambiado(self):
+        red = self.head()
+        self.escribir("src/test/kotlin/ATest.kt", "// Resumen: prueba A.\n/** Clase ATest: verifica A. */\nclass ATest\n")
+        self.assertEqual(m.senales_git(red=red), [])
+
+    def test_un_cambio_de_codigo_con_comentarios_sigue_avisando(self):
+        red = self.head()
+        self.escribir("src/test/kotlin/ATest.kt", "// Resumen: prueba A.\nclass ATest2\n")
+        self.assertEqual([c for c, _ in m.senales_git(red=red)], ["test_cambiado"])
 
     def test_sin_cambios_no_avisa(self):
         self.assertEqual(m.senales_git(desde=self.head(), red=self.head()), [])

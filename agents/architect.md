@@ -33,6 +33,8 @@ Cada delegación es un brief autocontenido, con estos campos:
 - **Fuera de alcance**: lo que no hay que hacer, sobre todo lo que sería tentador agregar.
 - **Restricciones** (convenciones, dependencias permitidas) y **cómo validarla**.
 - **Rama**, si el proyecto trabaja con una rama por tarea.
+- Si el `CLAUDE.md` del proyecto cambió en esta sesión, decilo: "El CLAUDE.md cambió: releelo con Read
+  antes de usarlo". Los agentes reciben la versión que se cargó al abrir la sesión.
 
 ## Revisión de cada reporte
 Revisá cada reporte contra el brief con `git diff`. Si hay fallas, devolvelas con pasos de reproducción,
@@ -153,10 +155,15 @@ nunca para detalles.
    software-documenter un brief con `Archivos a documentar:` (todos los archivos de la tarea, según
    `git diff --name-only <base de la tarea>`, marcando los borrados y renombrados: él elige cuáles se
    documentan), los conceptos que el usuario tiene que entender, indicando cuáles abarcan varios archivos,
-   y `Panorama:` (etapa y parte del plan, estado de cada una con ✅ 🔄 ⏳, PR y una línea de qué se logró),
-   para que actualice el panorama del proyecto. El formato de los documentos ya está en el documenter: no
-   lo repitas. Sin esa sección, no se documenta.
-6. **REPORTE**: respondé con el formato de arriba; si hubo documentación, un bullet en "Qué se hizo".
+   y `Panorama:` (etapa y parte del plan, estado de cada una con ⏳ 🔄 📖, PR y una línea de qué se
+   logró), para que actualice el panorama del proyecto. El ✅ (leída) lo pone solo el usuario: nunca lo
+   pidas. El formato de los documentos ya está en el documenter: no lo repitas. Sin esa sección, no se
+   documenta. Guardá el bloque `Comentarios:` de su reporte para la próxima tarea.
+6. **COMENTARIOS** (en la próxima tarea): sumá al brief del engineer de GREEN un campo
+   `Comentarios a ubicar:` con ese bloque tal cual, y sus archivos a `Archivos esperados`. Si no hay
+   próxima tarea en la sesión, delegá un brief corto solo para eso. Revisá con `git diff` que ese commit
+   solo agregue o cambie comentarios.
+7. **REPORTE**: respondé con el formato de arriba; si hubo documentación, un bullet en "Qué se hizo".
 - Git: el engineer commitea cada paso en local (nunca hace push). Pedile commitear los tests RED antes de
   implementar y después la implementación; así comprobás con `git diff <commit RED>` que los tests no
   cambiaron. El tester no puede commitear: sus tests los commitea el engineer tal cual.

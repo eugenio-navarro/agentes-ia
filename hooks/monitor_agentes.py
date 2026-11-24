@@ -243,8 +243,9 @@ def senal_costo(a, historia):
         return []
     mediana = statistics.median(previos)
     if a["tokens"] > UMBRALES["veces_mediana"] * mediana:
-        return [("costo", f"gastó {a['tokens'] / mediana:.1f} veces lo de una tarea típica "
-                          f"({miles(a['tokens'])} contra {miles(mediana)} tokens)")]
+        return [("costo", f"gastó {a['tokens'] / mediana:.1f} veces lo de una tarea típica del mismo agente "
+                          f"({miles(a['tokens'])} contra la mediana de {len(previos)} tareas de "
+                          f"{a['tipo']}: {miles(mediana)} tokens)")]
     return []
 
 
@@ -321,8 +322,23 @@ def senales_git(desde=None, red=None):
         for linea in (git("diff", "--name-status", red) or "").splitlines():
             partes = linea.split("\t")
             if len(partes) >= 2 and partes[0][:1] in "MDR" and is_test_path("/" + partes[1]):
+                if partes[0][:1] == "M" and solo_comentarios(red, partes[1]):
+                    continue  # los comentarios de documentación no cambian lo que el test verifica
                 s.append(("test_cambiado", f"se cambió {partes[1]} después del RED"))
     return s
+
+
+COMENTARIO = re.compile(r"^\s*(//|/\*|\*|#|--)")
+
+
+def solo_comentarios(desde, path):
+    """True si desde REF solo se agregaron o sacaron líneas de comentario o vacías en PATH."""
+    diff = git("diff", "-U0", desde, "--", path)
+    if not diff:
+        return False
+    cambios = [l[1:] for l in diff.splitlines()
+               if l[:1] in "+-" and not l.startswith(("+++", "---"))]
+    return bool(cambios) and all(not c.strip() or COMENTARIO.match(c) for c in cambios)
 
 
 # --- reportes ----------------------------------------------------------------

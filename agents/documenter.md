@@ -101,10 +101,14 @@ no está, reportalo.
   la línea de qué se logró si la parte la tiene, y un ítem por archivo de la tarea, con su link a GitHub y
   el de su documento, o "configuración, no se documenta". Un archivo que ya está en la parte no se repite:
   se marca "(modificado)".
-- Estados con emojis: ✅ Listo, 🔄 En curso, ⏳ Pendiente. `read_file_content` muestra el 🔄 como "ð": es
-  un error de la lectura, en el documento está bien; no lo "corrijas".
-- Agregar ítems es un cambio de estructura: un `read_doc` y un solo `update_doc` (ver "Carpetas y
-  documentos"). Al final, verificalo con `read_file_content`.
+- Estados con emojis: ⏳ Pendiente, 🔄 En curso, 📖 Terminada (para leer) y ✅ Leída. Al cerrar una
+  tarea, la parte queda en 📖. El ✅ lo pone solo el usuario, cuando leyó la documentación: nunca lo
+  pongas ni lo saques, salvo que una parte con ✅ cambie en esta tarea, que vuelve a 📖 para que relea
+  lo nuevo. `read_file_content` muestra algunos emojis rotos (el 🔄 como "ð"): es un error de la lectura,
+  en el documento están bien; no los "corrijas".
+- Todo el panorama se actualiza con un `read_doc` y **un solo** `update_doc` que lleva todos los cambios
+  juntos (estados, textos y todos los ítems con sus links), del final hacia el principio: nunca una
+  llamada por link o por ítem. Al final, verificalo con `read_file_content`.
 
 ## Correcciones
 Los errores de nombres que encuentres, en los documentos que tocás o en sus carpetas, los corregís vos sin
@@ -137,3 +141,8 @@ Devolvé, por archivo: documento creado o actualizado (con su enlace), secciones
 nuevas; los conceptos generales creados o actualizados; qué cambiaste en el panorama; las correcciones,
 una línea cada una; y lo que movés a `Para borrar`. Al final, lo que no documentaste y por qué (archivos borrados o fuera de las
 carpetas documentadas, herramientas no disponibles).
+
+Cerrá con un bloque `Comentarios:` para que el engineer los copie al código: por cada documento que
+creaste o cambiaste, la ruta del archivo en el repositorio y, **tal cual quedaron en Drive**, el texto
+del Resumen y el de cada clase y cada función (`- Clase Nombre: texto`, `- Función nombre: texto`). Sin
+los conceptos. Si un texto no cambió, no lo repitas.

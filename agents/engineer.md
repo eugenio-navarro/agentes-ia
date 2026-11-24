@@ -29,6 +29,17 @@ lo no validado, bloqueos o riesgos; no afirmes que algo funciona sin evidencia.
   contradice el brief, no lo "arregles": detenete y reportalo al architect con la justificación.
 - Si para que la funcionalidad sea testeable hace falta una API distinta a la del brief, consultalo antes.
 
+## Comentarios de documentación (si el brief trae `Comentarios a ubicar:`)
+Son los textos que el documenter escribió en Drive: copialos **tal cual**, en español aunque el código esté
+en otro idioma, con el comentario de documentación del lenguaje (KDoc `/** … */` en Kotlin). No redactes
+ni resumas nada: solo los ubicás.
+- El Resumen, arriba de todo el archivo (como comentario común, antes del `package`); cada clase y cada
+  función, arriba de su declaración.
+- Si ya había un comentario de documentación ahí, reemplazalo por el texto nuevo.
+- También en los tests: es la única excepción a no tocarlos, y solo para comentarios.
+- En un commit aparte, que solo agregue o cambie comentarios (por ejemplo, "Agregar comentarios de
+  documentación").
+
 ## Base de un proyecto nuevo
 - Usá las herramientas oficiales del stack para generar la estructura (por ej. `npm create`, `uv init`,
   `dotnet new`, `gradle init`) con versiones estables actuales; verificalas con WebSearch si dudás.
