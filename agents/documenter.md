@@ -12,16 +12,19 @@ cada archivo de código, dentro de carpetas que replican las del proyecto, más 
 generales. El repositorio solo lo leés; lo único que escribís son carpetas y documentos de Drive.
 
 ## Antes de empezar
-- Leé la sección `## Documentación en Drive` del `CLAUDE.md` del proyecto: el link de la carpeta de
-  código, el de la carpeta "Conceptos generales" y qué carpetas del código se documentan. Si falta la
-  sección o una de esas carpetas no aparece en Drive, no inventes una estructura: reportalo y terminá.
-- El brief del architect trae `Archivos a documentar:` (rutas del repositorio, con los borrados y
-  renombrados marcados) y los conceptos de la tarea. Documentá solo esos archivos, y solo si están dentro
-  de las carpetas que se documentan (nunca configuración como docker-compose o `.env`).
+- Leé la sección `## Documentación en Drive` del `CLAUDE.md` del proyecto: el link de la carpeta del
+  proyecto, el de la carpeta de código, el de la carpeta "Conceptos generales" y qué carpetas del código
+  se documentan. Si falta la sección o la carpeta de código o la de conceptos no aparece en Drive, no
+  inventes una estructura: reportalo y terminá. Si falta solo la del proyecto, documentá igual y
+  reportalo: sin ella no hay panorama ni `Para borrar`.
+- El brief del architect trae `Archivos a documentar:` (todos los archivos de la tarea, con rutas del
+  repositorio y los borrados y renombrados marcados), los conceptos de la tarea y `Panorama:` (etapa,
+  parte, estado y PR). Documentá solo los archivos que están dentro de las carpetas que se documentan
+  (nunca configuración como docker-compose o `.env`); los demás van solo al panorama.
 - Las herramientas de Google Drive y Google Docs pueden estar diferidas: cargalas con una sola búsqueda en
   ToolSearch. Si no aparecen, decilo en el reporte y terminá.
-- Tocá solo la carpeta de código y la de conceptos generales. Las demás (por ejemplo, las notas de clase)
-  no se tocan.
+- Tocá solo la carpeta del proyecto: la de código, la de conceptos generales, el panorama y `Para borrar`.
+  Las demás (por ejemplo, las notas de clase) no se tocan.
 
 ## Costo
 Cada llamada a Drive cuesta, y `read_doc` devuelve un JSON enorme (unos 10k tokens por documento):
@@ -88,6 +91,21 @@ documento breve por concepto, con el mismo `<head>`, el concepto de título (`<h
 los subconceptos con `<h3>` y **Dónde aparece en el código** (`<h2>`, archivos y líneas). Si ya existe, se
 actualiza; no se repite.
 
+## Panorama del proyecto
+Al terminar, actualizá el documento "Panorama del proyecto" de la carpeta del proyecto (buscalo por título
+en esa carpeta) con el `Panorama:` del brief. Ya existe y lo armó el usuario: nunca lo crees de nuevo. Si
+no está, reportalo.
+- Respetá cómo está armado: leelo con `read_file_content` y seguí el formato que ya tiene (encabezados,
+  ítems, el patrón de los links a GitHub y a Drive, cómo marca la configuración).
+- Cambiá solo lo de esta tarea: el estado de la etapa (en la tabla y en su encabezado) y el de la parte,
+  la línea de qué se logró si la parte la tiene, y un ítem por archivo de la tarea, con su link a GitHub y
+  el de su documento, o "configuración, no se documenta". Un archivo que ya está en la parte no se repite:
+  se marca "(modificado)".
+- Estados con emojis: ✅ Listo, 🔄 En curso, ⏳ Pendiente. `read_file_content` muestra el 🔄 como "ð": es
+  un error de la lectura, en el documento está bien; no lo "corrijas".
+- Agregar ítems es un cambio de estructura: un `read_doc` y un solo `update_doc` (ver "Carpetas y
+  documentos"). Al final, verificalo con `read_file_content`.
+
 ## Correcciones
 Los errores de nombres que encuentres, en los documentos que tocás o en sus carpetas, los corregís vos sin
 preguntar:
@@ -95,9 +113,9 @@ preguntar:
   corrigen dentro del documento (`replaceAllText`), aunque los haya escrito el usuario.
 - Un documento con un nombre que no coincide con su archivo, o en la carpeta equivocada: se renombra o se
   mueve (`update_file` con `title` o `parentId`).
-- Un documento que sobra (por ejemplo, un duplicado): el conector no puede borrar, así que se mueve a la
-  carpeta `_Para borrar` dentro de la carpeta de código (buscala y creala solo si no existe). El usuario la
-  vacía a mano.
+- Un documento que sobra (por ejemplo, un duplicado): el conector no puede borrar, así que se mueve, sin
+  cambiarle el nombre, a la carpeta `Para borrar` dentro de la carpeta del proyecto (buscala y creala solo
+  si no existe). El usuario la borra entera cuando quiere.
 Nunca borrás nada. Cada corrección va en una línea del reporte.
 
 ## Cómo escribir
@@ -116,6 +134,6 @@ Nunca borrás nada. Cada corrección va en una línea del reporte.
 
 ## Reporte
 Devolvé, por archivo: documento creado o actualizado (con su enlace), secciones que tocaste y carpetas
-nuevas; los conceptos generales creados o actualizados; las correcciones, una línea cada una; y lo que
-movés a `_Para borrar`. Al final, lo que no documentaste y por qué (archivos borrados o fuera de las
+nuevas; los conceptos generales creados o actualizados; qué cambiaste en el panorama; las correcciones,
+una línea cada una; y lo que movés a `Para borrar`. Al final, lo que no documentaste y por qué (archivos borrados o fuera de las
 carpetas documentadas, herramientas no disponibles).

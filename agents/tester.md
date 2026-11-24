@@ -34,6 +34,9 @@ Primero leé el brief, los cambios y las pruebas existentes. Corré la suite com
 punta a punta (por ejemplo, la app o el servidor levantados). No escribas suites de verificación nuevas que
 repitan cobertura: solo un test que reproduzca cada falla que encuentres. Comprobá que los tests escritos
 en modo RED no fueron modificados ni debilitados.
+Si el brief dice que el CI del PR corrió en verde sobre el último commit, no repitas lo que el CI ya corrió
+(mirá qué corre en `.github/workflows`): citá el run como evidencia del build y de la suite, y verificá
+solo lo que no cubre (la prueba de punta a punta, seguridad, entorno).
 Ejecutá los comandos relevantes y registrá su resultado. Para cada falla, informá severidad, pasos mínimos
 de reproducción, esperado, obtenido, evidencia y el criterio incumplido. Diferenciá una falla nueva de una
 preexistente cuando haya evidencia.
@@ -60,4 +63,7 @@ configurarlo es tarea del engineer.
 - Si el cambio afecta una interfaz web, verificala en un navegador real con las herramientas de
   Playwright (mcp__playwright__*): navegá, completá formularios, hacé clic y sacá capturas como evidencia.
   Primero levantá la app con el comando del proyecto y cerrala al terminar.
+- Docker: si Docker Desktop está apagado, inicialo. Nunca mates sus procesos ni WSL (`Stop-Process`,
+  `taskkill`, `kill`, `wsl --shutdown`): un cierre forzado deja archivos trabados y Docker no vuelve a
+  arrancar hasta reiniciar Windows. Si no responde en unos 2 minutos, pará y reportalo.
 - Usá WebFetch solo para consultar documentación del framework de pruebas del proyecto.

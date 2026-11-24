@@ -66,7 +66,8 @@ Cuando se cumple un objetivo del plan del proyecto (un hito del `CLAUDE.md` o de
 hacé una revisión integral antes de seguir:
 1. Corré `python ~/.claude/hooks/monitor_agentes.py etapa --desde <commit donde empezó el objetivo>`.
 2. Delegá al tester una verificación de la suite completa, el build sin warnings y, si hay interfaz, el
-   flujo de punta a punta.
+   flujo de punta a punta. Si el CI ya corrió en verde sobre el último commit, citalo en el brief (como
+   en la verificación del flujo TDD).
 3. Revisá y reportá, breve, cada área:
    - **Objetivo**: ¿se cumplió lo prometido y se puede mostrar?
    - **Calidad**: suite, warnings, lint, deuda técnica que quedó.
@@ -114,8 +115,8 @@ Primero determiná en cuál de los dos casos estás:
    Mostrale también un resumen breve de la filosofía de trabajo (FILOSOFIA, ya está en tu contexto) y
    preguntale si se mantiene tal cual o si quiere ajustarla para este proyecto, en qué idioma van el
    código y los commits, dónde se registran las decisiones (ADRs en `docs/adr/`, el documento de
-   diseño u otro lugar) y si quiere documentación en Google Drive (links de la carpeta de código y de "Conceptos
-   generales", y qué carpetas del código se documentan).
+   diseño u otro lugar) y si quiere documentación en Google Drive (links de la carpeta del proyecto, de
+   la de código y de "Conceptos generales", y qué carpetas del código se documentan).
 2. Delegá al software-engineer la base del proyecto: `git init` + `.gitignore`, estructura de carpetas
    idiomática del stack, gestor de dependencias, framework de pruebas con un test de humo, linter y
    formateador configurados, comando para correr la app, README breve y `CLAUDE.md` (stack, comandos de
@@ -144,13 +145,17 @@ nunca para detalles.
    sin modificarlas (indicá las rutas de los tests en el brief) y luego mejorar el diseño manteniendo todo
    en verde.
 3. **VERIFICACIÓN**: delegá al software-tester (una instancia nueva) una verificación independiente:
-   suite completa, regresiones y una prueba real de punta a punta.
+   suite completa, regresiones y una prueba real de punta a punta. Si la tarea ya tiene PR, mirá antes
+   `gh pr checks`: si el CI corrió en verde sobre el último commit, ponelo en el brief con el link del run,
+   y el tester verifica solo lo que el CI no cubre.
 4. **MONITOREO**: corré el monitoreo.
 5. **DOCUMENTACIÓN**: si el `CLAUDE.md` del proyecto tiene `## Documentación en Drive`, delegá al
-   software-documenter un brief con `Archivos a documentar:` (los archivos de código de la tarea, según
-   `git diff --name-only <base de la tarea>`, marcando los borrados y renombrados) y los conceptos que el
-   usuario tiene que entender, indicando cuáles abarcan varios archivos. El formato de los documentos ya
-   está en el documenter: no lo repitas. Sin esa sección, no se documenta.
+   software-documenter un brief con `Archivos a documentar:` (todos los archivos de la tarea, según
+   `git diff --name-only <base de la tarea>`, marcando los borrados y renombrados: él elige cuáles se
+   documentan), los conceptos que el usuario tiene que entender, indicando cuáles abarcan varios archivos,
+   y `Panorama:` (etapa y parte del plan, estado de cada una con ✅ 🔄 ⏳, PR y una línea de qué se logró),
+   para que actualice el panorama del proyecto. El formato de los documentos ya está en el documenter: no
+   lo repitas. Sin esa sección, no se documenta.
 6. **REPORTE**: respondé con el formato de arriba; si hubo documentación, un bullet en "Qué se hizo".
 - Git: el engineer commitea cada paso en local (nunca hace push). Pedile commitear los tests RED antes de
   implementar y después la implementación; así comprobás con `git diff <commit RED>` que los tests no

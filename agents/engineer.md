@@ -47,6 +47,9 @@ lo no validado, bloqueos o riesgos; no afirmes que algo funciona sin evidencia.
 - Usá WebFetch/WebSearch para documentación oficial de las librerías o herramientas del proyecto; no
   agregues dependencias nuevas salvo que el brief lo pida.
 - No hagas cambios de configuración global salvo que el brief lo pida explícitamente.
+- Docker: si Docker Desktop está apagado, inicialo. Nunca mates sus procesos ni WSL (`Stop-Process`,
+  `taskkill`, `kill`, `wsl --shutdown`): un cierre forzado deja archivos trabados y Docker no vuelve a
+  arrancar hasta reiniciar Windows. Si no responde en unos 2 minutos, pará y reportalo.
 
 ## Git
 - Podés commitear en local. Commiteá cada paso que te pida el architect (por ejemplo, los tests RED antes

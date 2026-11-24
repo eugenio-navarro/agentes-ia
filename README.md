@@ -48,8 +48,10 @@ Todos siguen [FILOSOFIA.md](FILOSOFIA.md). Cada proyecto puede ajustarla en su `
 El documenter usa los conectores de Google Drive y Google Docs de claude.ai (tienen que estar conectados
 en la cuenta). El formato de cada documento está en su prompt (`agents/documenter.md`), igual para
 todos los proyectos. En el `CLAUDE.md` de cada proyecto, la sección `## Documentación en Drive` tiene
-lo propio: los links de la carpeta de código y de "Conceptos generales", y qué carpetas del código se
-documentan. Cada documento nuevo se crea en una sola llamada, desde HTML con los estilos de la plantilla.
+lo propio: los links de la carpeta del proyecto, de la de código y de "Conceptos generales", y qué
+carpetas del código se documentan. Cada documento nuevo se crea en una sola llamada, desde HTML con los
+estilos de la plantilla. Al cerrar cada tarea también actualiza el "Panorama del proyecto" si existe en
+la carpeta del proyecto, y los documentos que sobran los mueve a `Para borrar`, ahí mismo.
 
 ## Estructura
 
