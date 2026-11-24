@@ -22,7 +22,10 @@ import {
   formatearTokens,
   guardarNombreTramo,
   guardarResumenCorto,
+  cerrarHuerfanos,
+  hayHuerfanos,
   hayParaArchivar,
+  planVigente,
   iniciarAccion,
   iniciarTurno,
   marcarResumenPedido,
@@ -148,12 +151,28 @@ export const register: Register = on => {
       }
     }
 
+    // Cada tanto se compara con los agentes que el motor tiene en curso, para no quedar trabado en viejos.
+    let tics = 0
+    const revisarHuerfanos = async (lista: readonly Agente[], ahora: number) => {
+      if (!lista.some(a => a.id !== ID_PRINCIPAL && a.estado === 'trabajando')) return
+      try {
+        const vivos = new Set(
+          (await $.agent.list()).filter(a => ['pending', 'running', 'waiting'].includes(a.status)).map(a => a.id),
+        )
+        if (hayHuerfanos(lista, vivos, ahora)) await update($, agentes, l => cerrarHuerfanos(l, vivos, ahora))
+      } catch {
+        // Sin la lista del motor, se espera al próximo control.
+      }
+    }
+
     $.clock.every(1000, () => {
       void (async () => {
         const lista = await read($, agentes)
         const ahora = await $.clock.now()
         if (lista.some(a => a.estado === 'trabajando')) await update($, reloj, () => ahora)
         if (hayParaArchivar(lista, ahora)) await update($, agentes, l => archivarViejos(l, ahora))
+        tics = (tics + 1) % 10
+        if (tics === 0) await revisarHuerfanos(lista, ahora)
         await atenderPendientes()
       })()
     })
@@ -324,7 +343,7 @@ export const register: Register = on => {
     // Si el agente escribió su lista de tareas, se muestra esa; si no, sus últimos tramos de trabajo.
     const pasos = (agente: Agente) => {
       const plan = agente.plan ?? []
-      if (plan.length > 0) return columnaDePasos(filasDePlan(plan))
+      if (planVigente(plan)) return columnaDePasos(filasDePlan(plan))
       const tramos = filasDeTramos(agente)
       if (tramos.length > 0) return columnaDePasos(tramos)
       return agente.estado === 'trabajando' ? <Text dimColor>Arrancando…</Text> : null

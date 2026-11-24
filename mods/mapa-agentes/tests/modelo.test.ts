@@ -9,7 +9,10 @@ import {
   pedidoDeNombreTramo,
   siguienteTramoSinNombre,
   ESPERA_ARCHIVO_MS,
+  GRACIA_HUERFANO_MS,
   archivarViejos,
+  cerrarHuerfanos,
+  planVigente,
   hayParaArchivar,
   nombrarPrincipal,
   rolDe,
@@ -213,6 +216,12 @@ describe('plan del agente (su lista de tareas)', () => {
     expect(planNuevo(plan, 'TaskUpdate', { taskId: '1', status: 'deleted' })).toEqual([])
   })
 
+  test('al cerrar el turno la lista queda terminada y deja de mostrarse', async () => {
+    const plan = planNuevo([], 'mcp__ccd_turn__update_plan', { items: todos.map(({ content, status }) => ({ content, status })) })
+    expect(planVigente(plan)).toBe(true)
+    expect(planVigente(planNuevo(plan, 'mcp__ccd_turn__wrap_up', { recap: 'listo' }))).toBe(false)
+  })
+
   test('las herramientas de plan no cuentan como acciones', async () => {
     expect(esHerramientaDePlan('TodoWrite')).toBe(true)
     expect(esHerramientaDePlan('mcp__ccd_turn__update_plan')).toBe(true)
@@ -242,6 +251,14 @@ describe('filtros e historial', () => {
     const archivada = archivarViejos(lista, 9 + ESPERA_ARCHIVO_MS)
     expect(filtrar(archivada, 'todos').map(a => a.id)).toEqual([ID_PRINCIPAL, 'test-1'])
     expect(filtrar(archivada, 'historial').map(a => a.id)).toEqual(['ing-1'])
+  })
+
+  test('un subagente que el motor ya no tiene en curso queda detenido, no trabado', async () => {
+    const lista = registrarSpawn([], spawnIng, 0)
+    const vivos = new Set<string>()
+    expect(cerrarHuerfanos(lista, vivos, GRACIA_HUERFANO_MS - 1).find(a => a.id === 'ing-1')?.estado).toBe('trabajando')
+    expect(cerrarHuerfanos(lista, vivos, GRACIA_HUERFANO_MS).find(a => a.id === 'ing-1')?.estado).toBe('detenido')
+    expect(cerrarHuerfanos(lista, new Set(['ing-1']), GRACIA_HUERFANO_MS).find(a => a.id === 'ing-1')?.estado).toBe('trabajando')
   })
 
   test('el principal nunca pasa al historial', async () => {

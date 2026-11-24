@@ -177,6 +177,7 @@ const HERRAMIENTAS_DE_PLAN = new Set([
   'TaskList',
   'TaskGet',
   'mcp__ccd_turn__update_plan',
+  'mcp__ccd_turn__wrap_up',
 ])
 
 /** Herramientas con las que el agente lleva su lista de tareas: no son pasos de trabajo. */
@@ -225,6 +226,9 @@ export function planNuevo(plan: readonly PasoPlan[], herramienta: string, args: 
       return texto === undefined ? [...plan] : [...plan, { id: typeof id === 'string' ? id : undefined, texto, estado: 'pendiente' }]
     }
 
+    case 'mcp__ccd_turn__wrap_up':
+      return plan.map(p => ({ ...p, estado: 'hecho' as const }))
+
     case 'TaskUpdate': {
       if (args.status === 'deleted') return plan.filter(p => p.id !== args.taskId)
       return plan.map(p =>
@@ -244,6 +248,9 @@ export function planNuevo(plan: readonly PasoPlan[], herramienta: string, args: 
 }
 
 const esPaso = (p: PasoPlan | undefined): p is PasoPlan => p !== undefined
+
+/** La lista de tareas solo se muestra mientras le quede algo por hacer; terminada, quedan los tramos. */
+export const planVigente = (plan: readonly PasoPlan[]) => plan.some(p => p.estado !== 'hecho')
 
 export function actualizarPlan(
   lista: readonly Agente[],
@@ -406,6 +413,27 @@ export function tokensDeUso(uso: {
 }
 
 // ---------- Filtros e historial ----------
+
+/** Cuánto se espera antes de dar por detenido a un subagente que el motor ya no lista. */
+export const GRACIA_HUERFANO_MS = 30_000
+
+/**
+ * Un subagente que sigue "trabajando" acá pero que el motor ya no tiene en curso
+ * (terminó sin avisar o se cortó) pasa a detenido y cierra sus acciones.
+ */
+export function cerrarHuerfanos(lista: readonly Agente[], vivos: ReadonlySet<string>, ahora: number): Agente[] {
+  return lista.map(a =>
+    esHuerfano(a, vivos, ahora)
+      ? { ...a, estado: 'detenido', fin: ahora, enCurso: [], tramos: cerrarUltimo(a.tramos ?? []) }
+      : a,
+  )
+}
+
+const esHuerfano = (a: Agente, vivos: ReadonlySet<string>, ahora: number) =>
+  a.id !== ID_PRINCIPAL && a.estado === 'trabajando' && !vivos.has(a.id) && ahora - a.inicio >= GRACIA_HUERFANO_MS
+
+export const hayHuerfanos = (lista: readonly Agente[], vivos: ReadonlySet<string>, ahora: number) =>
+  lista.some(a => esHuerfano(a, vivos, ahora))
 
 const esTerminado = (a: Agente) => a.id !== ID_PRINCIPAL && a.estado !== 'trabajando'
 
