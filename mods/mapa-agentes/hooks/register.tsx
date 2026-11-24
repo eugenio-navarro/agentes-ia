@@ -89,6 +89,11 @@ async function rolDeLaSesion($: EngineInterface): Promise<void> {
   }
 }
 
+/** Guarda si el panel quedó cerrado; si no se puede guardar, sigue sin romper nada. */
+async function recordarCerrado($: EngineInterface, cerrado: boolean): Promise<void> {
+  await $.store.set(CLAVE_CERRADO, cerrado).catch(() => undefined)
+}
+
 /** Una frase del modelo chico, o nada si no contestó: entonces queda el texto provisorio. */
 async function pedirFrase($: EngineInterface, prompt: string): Promise<string | undefined> {
   try {
@@ -159,7 +164,7 @@ export const register: Register = on => {
   // /agentes abre el panel si está cerrado y lo cierra si está abierto; la elección se recuerda.
   on('command.run', { command: 'agentes' }, async $ => {
     const abierto = (await $.ui.panes()).some(p => p.id === PANEL)
-    await $.store.set(CLAVE_CERRADO, abierto)
+    await recordarCerrado($, abierto)
     if (abierto) {
       await $.ui.close({ id: PANEL })
       return { text: 'Mapa de agentes cerrado. /agentes lo vuelve a abrir.' }
@@ -168,10 +173,11 @@ export const register: Register = on => {
     return { text: 'Mapa de agentes abierto. /agentes lo cierra.' }
   })
 
-  // Cerrarlo a mano también se recuerda.
+  // Cerrarlo a mano también se recuerda; el cierre pasa primero, guardar nunca lo frena.
   on('ui.close', async ($, e, next) => {
-    if (e.id === PANEL && e.origin.kind === 'person') await $.store.set(CLAVE_CERRADO, true)
-    return next(e)
+    const cerrado = await next(e)
+    if (e.id === PANEL && e.origin.kind === 'person') await recordarCerrado($, true)
+    return cerrado
   })
 
   on('agent.spawn', async ($, e, next) => {
