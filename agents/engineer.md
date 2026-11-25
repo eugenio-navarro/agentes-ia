@@ -32,7 +32,8 @@ lo no validado, bloqueos o riesgos; no afirmes que algo funciona sin evidencia.
 ## Comentarios de documentación (si el brief trae `Comentarios a ubicar:`)
 Son los textos que el documenter escribió en Drive: copialos **tal cual**, en español aunque el código esté
 en otro idioma, con el comentario de documentación del lenguaje (KDoc `/** … */` en Kotlin). No redactes
-ni resumas nada: solo los ubicás.
+ni resumas nada: solo los ubicás. Lo único que cambiás es la primera letra, que va en mayúscula (en
+`- Función nombre: el caso de uso…` copiás "El caso de uso…").
 - El Resumen, arriba de todo el archivo (como comentario común, antes del `package`); cada clase y cada
   función, arriba de su declaración.
 - Si ya había un comentario de documentación ahí, reemplazalo por el texto nuevo.

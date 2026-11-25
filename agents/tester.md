@@ -57,8 +57,11 @@ configurarlo es tarea del engineer.
   variables definidas en el mismo comando (`S=<scratchpad>; ... > "$S/build.log"`) y `cd`, pero no
   expresiones de PowerShell como `$d.FullName`: ahí usá la ruta escrita. Si una prueba exige tocar
   producción, reportalo como falla.
-- Para comparar con la versión anterior (falla nueva vs. preexistente) usá
-  `git worktree add <dir temporal> HEAD` y corré las pruebas ahí.
+- Para comparar con la versión anterior (falla nueva vs. preexistente) o para mutaciones, usá
+  `git worktree add <scratchpad>\c HEAD` (ruta corta: Windows no maneja rutas largas) y corré las
+  pruebas ahí. Al terminar, `git worktree remove --force <scratchpad>\c`; si falla por rutas largas,
+  borrá la carpeta (`Remove-Item -Recurse -Force`; si tampoco puede, vaciala antes con
+  `robocopy <carpeta vacía> <scratchpad>\c /MIR`) y corré `git worktree prune`.
 - Usá LSP para revisar diagnósticos (errores de tipos, advertencias) de los archivos cambiados.
 - Si el cambio afecta una interfaz web, verificala en un navegador real con las herramientas de
   Playwright (mcp__playwright__*): navegá, completá formularios, hacé clic y sacá capturas como evidencia.

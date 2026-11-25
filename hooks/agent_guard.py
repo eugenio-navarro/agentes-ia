@@ -180,6 +180,10 @@ SHELL_WRITERS = {"rm", "rmdir", "del", "erase", "rd", "mv", "move", "touch",
                  "new-item", "ni", "clear-content", "rename-item", "rni"}
 SHELL_COPIERS = {"cp", "copy", "copy-item", "cpi"}  # only the destination matters
 PS_PATH_PARAMS = {"-path", "-literalpath", "-filepath", "-destination"}
+# PowerShell parameters whose next token is a value, not a path (`-ErrorAction SilentlyContinue`).
+PS_VALUE_PARAMS = {"-value", "-encoding", "-itemtype", "-newname", "-erroraction", "-ea",
+                   "-warningaction", "-wa", "-include", "-exclude", "-filter"}
+REDIRECT_TOKEN = re.compile(r"^\d?>")  # `2>/dev/null` glued to its target: redirect_targets checks it
 
 
 def check_tester_segment(tokens, cwd):
@@ -188,7 +192,7 @@ def check_tester_segment(tokens, cwd):
     if not tokens:
         return
     cmd = re.sub(r"\.exe$", "", os.path.basename(tokens[0]).lower())
-    args = tokens[1:]
+    args = [a for a in tokens[1:] if not REDIRECT_TOKEN.match(a)]
     positional = [a for a in args if not a.startswith("-")]
 
     if cmd == "git":
@@ -213,8 +217,7 @@ def check_tester_segment(tokens, cwd):
         for i, a in enumerate(args):
             if a.lower() in PS_PATH_PARAMS and i + 1 < len(args):
                 targets.append(args[i + 1])
-            elif not a.startswith("-") and (i == 0 or args[i - 1].lower() not in
-                                            ("-value", "-encoding", "-itemtype", "-newname")):
+            elif not a.startswith("-") and (i == 0 or args[i - 1].lower() not in PS_VALUE_PARAMS):
                 targets.append(a)
     else:
         return

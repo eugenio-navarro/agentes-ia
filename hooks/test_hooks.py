@@ -134,6 +134,20 @@ class TesterGuard(unittest.TestCase):
         ps = '$S = "src"; Set-Content -Path "$S\\main.cs" -Value x'
         self.assertEqual(guard("tester", "PowerShell", agent="software-tester", command=ps), 2)
 
+    def test_limpia_su_copia_del_scratchpad(self):
+        scratch = os.path.join(tempfile.gettempdir(), "claude", "abc", "scratchpad")
+        ps = (f"$base = '{scratch}'; $p = \"$base\\c\"; "
+              "Remove-Item -LiteralPath $p -Force -Recurse -ErrorAction SilentlyContinue")
+        self.assertEqual(guard("tester", "PowerShell", agent="software-tester", command=ps), 0)
+        s = scratch.replace("\\", "/")
+        for cmd in (f'C="{s}/c"; rm -rf "$C"; cp -r src gradlew "$C"/ 2>/dev/null',
+                    f'git worktree add "{s}/c" HEAD', f'git worktree remove --force "{s}/c"',
+                    "git worktree prune"):
+            self.assertEqual(self.bash(cmd), 0, cmd)
+        ps = "Remove-Item -LiteralPath src -Recurse -ErrorAction SilentlyContinue"
+        self.assertEqual(guard("tester", "PowerShell", agent="software-tester", command=ps), 2)
+        self.assertEqual(self.bash("cp /tmp/x.py src/main.py 2>/dev/null"), 2)
+
     def test_una_variable_no_esconde_produccion(self):
         for cmd in ("M=src/main/kotlin/model\ncat > $M/Temporal.kt <<'EOF'\nx\nEOF",
                     "echo x > $DESCONOCIDA/main.py", "S=src; rm $S/main.py",

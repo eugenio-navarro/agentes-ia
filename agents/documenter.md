@@ -78,6 +78,10 @@ documento (Encabezado 1, 2 y 3, con el color de acento en el 3). Copiá el `<hea
    negrita, y después qué hace. Si el archivo no tiene clase, solo `<p>-</p>`.
 5. **Funciones** (`<h2>`): igual que Clase. Si no hay, solo `<p>-</p>`.
 
+Antes de escribir qué hace una clase o una función, leé su comentario de documentación en el código: si
+explica un "por qué" (una decisión de seguridad o una regla, como "así no se revela si el número
+existe"), conservalo en tu texto. El engineer reemplaza ese comentario por el tuyo, y así no se pierde.
+
 Cada lista va en un solo `<ol>` o `<ul>`: si la partís, la numeración vuelve a empezar. En el texto,
 escapá `&`, `<` y `>` (`&amp;`, `&lt;`, `&gt;`): en Kotlin aparecen seguido (`List<String>`). Las notas de
 ayuda de la plantilla ("(texto/ítems)", "(ítems, - si no hay nada)", "[Nombre del concepto]") solo dicen
