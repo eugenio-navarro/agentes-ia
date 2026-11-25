@@ -31,13 +31,16 @@ lo no validado, bloqueos o riesgos; no afirmes que algo funciona sin evidencia.
 
 ## Comentarios de documentación (si el brief trae `Comentarios a ubicar:`)
 Son los textos que el documenter escribió en Drive, en un archivo cuya ruta trae el brief. No lo leas
-entero: corré `python ~/.claude/hooks/ubicar_comentarios.py <ruta>` desde la raíz del repo. El script
-los ubica en Kotlin con las reglas de abajo y lista lo que quedó para hacer a mano (otro lenguaje, una
-declaración que no encontró o que está repetida): para eso, buscá en el archivo solo esa línea (Grep).
+entero: corré `python ~/.claude/hooks/ubicar_comentarios.py <ruta> --formato <formato>` desde la raíz
+del repo. El formato es el que fije el `CLAUDE.md` del proyecto: `barras` (un `//` por oración si cada
+una entra en la línea; si no, un bloque `/* … */` sin asteriscos) o `kdoc` (`/** … */`) si no dice nada.
+El script los ubica en Kotlin con las reglas de abajo y lista lo que quedó para hacer a mano (otro
+lenguaje, una declaración que no encontró o que está repetida): para eso, buscá en el archivo solo esa
+línea (Grep). Si rechaza el bloque por una línea fuera de formato, no lo corrijas vos: reportalo.
 Después corré el formateador y el linter del proyecto, porque el script no dispara el hook.
 Reglas, para lo que ubiques a mano: copialos **tal cual**, en español aunque el código esté en otro
-idioma, con el comentario de documentación del lenguaje (KDoc `/** … */` en Kotlin). No redactes ni
-resumas nada: solo los ubicás. Lo único que cambiás es la primera letra, que va en mayúscula (en
+idioma, con el formato de comentarios del proyecto (KDoc `/** … */` en Kotlin si no dice nada). No
+redactes ni resumas nada: solo los ubicás. Lo único que cambiás es la primera letra, que va en mayúscula (en
 `- Función nombre: el caso de uso…` copiás "El caso de uso…").
 - El Resumen, arriba de todo el archivo (como comentario común, antes del `package`); cada clase y cada
   función, arriba de su declaración.

@@ -69,6 +69,20 @@ class Analisis(unittest.TestCase):
         self.assertEqual([c for c, _ in m.senal_costo(caro, historia)], ["costo"])
         self.assertEqual(m.senal_costo(caro, historia[:2]), [])  # pocas muestras: no compara
 
+    def test_compara_contra_el_mismo_tipo_de_tarea_y_por_llamada(self):
+        historia = [{"id": f"g{i}", "tipo": "software-engineer", "descripcion": f"ING T{i}: GREEN de X",
+                     "tokens": 10000, "llamadas": 20} for i in range(3)]
+        historia += [{"id": f"m{i}", "tipo": "software-engineer", "descripcion": f"ING T{i}: mergear PR",
+                      "tokens": 1000, "llamadas": 5} for i in range(3)]
+        green = {"id": "x", "tipo": "software-engineer", "descripcion": "ING T9: GREEN de Login",
+                 "tokens": 15000, "llamadas": 30}
+        self.assertEqual(m.senal_costo(green, historia), [])  # contra las GREEN no es anómalo
+        caro = dict(green, tokens=30000)
+        aviso = m.senal_costo(caro, historia)[0][1]
+        self.assertIn("3 tareas de GREEN de software-engineer", aviso)
+        self.assertIn("30 llamadas (mediana 20) de 1.000 tokens cada una (mediana 500)", aviso)
+        self.assertIsNone(m.tipo_de_tarea({"descripcion": "ING T52: merge #13 e implementar X"}))
+
     def test_el_aviso_de_costo_muestra_las_salidas_mas_grandes(self):
         herramientas = [("Bash", {"command": "./gradlew test"}, None),
                         ("Read", {"file_path": "C:/p/src/Grande.kt"}, None)]

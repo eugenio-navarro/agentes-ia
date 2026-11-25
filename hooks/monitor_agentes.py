@@ -136,6 +136,7 @@ def analizar_agente(jsonl, meta=None):
         "escritos": escritos,
         "inicio": min(tiempos) if tiempos else "",
         "herramientas": len(herramientas),
+        "llamadas": len(usos),
         "salidas": sorted(salidas, key=lambda x: x[0], reverse=True)[:3],
     }
 
@@ -239,16 +240,47 @@ def senales_agente(a, esperado=None):
     return s
 
 
+# Tipo de tarea según la descripción ("ING T89: GREEN de Login"). Si nombra más de uno, no se clasifica.
+TIPOS_DE_TAREA = {
+    "RED": re.compile(r"\bred\b", re.IGNORECASE),
+    "GREEN": re.compile(r"\bgreen\b|\bimplement", re.IGNORECASE),
+    "verificación": re.compile(r"verific", re.IGNORECASE),
+    "merge": re.compile(r"\bmerge|\bmergear|\bintegrar", re.IGNORECASE),
+}
+
+
+def tipo_de_tarea(a):
+    tipos = [t for t, patron in TIPOS_DE_TAREA.items() if patron.search(a.get("descripcion") or "")]
+    return tipos[0] if len(tipos) == 1 else None
+
+
+def por_llamada(a):
+    return a["tokens"] / a["llamadas"] if a.get("llamadas") else 0
+
+
 def senal_costo(a, historia):
-    previos = [h["tokens"] for h in historia if h["tipo"] == a["tipo"] and h["id"] != a["id"] and h["tokens"]]
+    """Compara contra las tareas del mismo agente y, si hay suficientes, del mismo tipo (GREEN, RED...)."""
+    previos = [h for h in historia if h["tipo"] == a["tipo"] and h["id"] != a["id"] and h["tokens"]]
+    tipo = tipo_de_tarea(a)
+    mismo_tipo = [h for h in previos if tipo and tipo_de_tarea(h) == tipo]
+    if len(mismo_tipo) >= UMBRALES["muestras_mediana"]:
+        previos, de_que = mismo_tipo, f"{tipo} de {a['tipo']}"
+    else:
+        de_que = a["tipo"]
     if len(previos) < UMBRALES["muestras_mediana"]:
         return []
-    mediana = statistics.median(previos)
-    if a["tokens"] > UMBRALES["veces_mediana"] * mediana:
-        return [("costo", f"gastó {a['tokens'] / mediana:.1f} veces lo de una tarea típica del mismo agente "
-                          f"({miles(a['tokens'])} contra la mediana de {len(previos)} tareas de "
-                          f"{a['tipo']}: {miles(mediana)} tokens)" + salidas_grandes(a))]
-    return []
+    mediana = statistics.median(h["tokens"] for h in previos)
+    if a["tokens"] <= UMBRALES["veces_mediana"] * mediana:
+        return []
+    texto = (f"gastó {a['tokens'] / mediana:.1f} veces lo de una tarea típica del mismo agente "
+             f"({miles(a['tokens'])} contra la mediana de {len(previos)} tareas de {de_que}: {miles(mediana)} tokens)")
+    con_llamadas = [h for h in previos if h.get("llamadas")]
+    if a.get("llamadas") and con_llamadas:
+        # muchas llamadas = tarea grande; muchos tokens por llamada = contexto pesado
+        texto += (f"; {a['llamadas']} llamadas (mediana {statistics.median(h['llamadas'] for h in con_llamadas):.0f})"
+                  f" de {miles(por_llamada(a))} tokens cada una"
+                  f" (mediana {miles(statistics.median(por_llamada(h) for h in con_llamadas))})")
+    return [("costo", texto + salidas_grandes(a))]
 
 
 def salidas_grandes(a):
@@ -256,8 +288,9 @@ def salidas_grandes(a):
     partes = []
     for largo, nombre, entrada in a.get("salidas", []):
         if largo:
-            que = comando(entrada)[:60] or corto(entrada.get("file_path") or "") or nombre
-            partes.append(f"{nombre} `{que}` ({miles(largo)} caracteres)")
+            nombre = nombre.split("__")[-1]  # mcp__<servidor>__read_doc -> read_doc
+            que = comando(entrada)[:60] or corto(entrada.get("file_path") or "")
+            partes.append(f"{nombre}{f' `{que}`' if que else ''} ({miles(largo)} caracteres)")
     return "; salidas más grandes: " + ", ".join(partes) if partes else ""
 
 

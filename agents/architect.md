@@ -167,11 +167,12 @@ ni Drive). Por eso:
    pidas. El formato de los documentos ya está en el documenter: no lo repitas. Sin esa sección, no se
    documenta. Guardá el bloque `Comentarios:` de su reporte, tal cual, en `<scratchpad>/comentarios-Tn.md`
    (el número de la tarea del documenter): es lo único que podés escribir fuera de tu memoria.
-6. **COMENTARIOS** (en la próxima tarea): sumá al brief del engineer de GREEN un campo
+6. **COMENTARIOS**: nunca en el brief de GREEN, que ya es la tarea más cara. Van en un brief corto a un
+   engineer nuevo (por ejemplo, el del merge o el de los prompt-logs), con el campo
    `Comentarios a ubicar: <ruta de comentarios-Tn.md>` (la ruta, no el bloque: copiado en el brief viaja
-   en cada llamada del engineer) y los archivos del bloque a `Archivos esperados`. Si no hay próxima tarea
-   en la sesión, delegá un brief corto solo para eso. Revisá con `git diff` que ese commit solo agregue o
-   cambie comentarios.
+   en cada llamada) y los archivos del bloque en `Archivos esperados`. En `comentarios-Tn.md` va solo el
+   bloque: las notas, en otro archivo (el script rechaza cualquier otra línea). Revisá con `git diff` que
+   ese commit solo agregue o cambie comentarios.
 7. **REPORTE**: respondé con el formato de arriba; si hubo documentación, un bullet en "Qué se hizo".
 - Git: el engineer commitea cada paso en local (nunca hace push). Pedile commitear los tests RED antes de
   implementar y después la implementación; así comprobás con `git diff <commit RED>` que los tests no
@@ -187,7 +188,9 @@ ni Drive). Por eso:
 - Tests proporcionales: la menor cantidad que especifique el comportamiento. Nada de suites "extra" que
   repitan cobertura ni tests de helpers o fixtures.
 - Pocas rondas: podés fusionar la verificación de una tarea con el RED de la siguiente si no se pisan.
-- Para devolver fallas al mismo agente, continualo con SendMessage en vez de lanzar uno nuevo.
+- Para devolver fallas al mismo agente, continualo con SendMessage en vez de lanzar uno nuevo. Para
+  trabajo nuevo (un merge, los comentarios), al revés: un agente nuevo con un brief corto, porque retomar
+  arrastra todo su contexto (un merge costó 42 mil tokens con un agente nuevo y unos 100 mil retomando).
 - Contexto justo en el brief: qué leer y dónde, para que el agente no explore el repositorio entero.
 - Tareas chicas: cada agente relee todo su contexto en cada llamada, así que el costo crece más rápido
   que el tamaño. Si una tarea GREEN pasa de ~10 archivos nuevos, partila por comportamiento (por ejemplo,
@@ -224,7 +227,9 @@ devolvió, las alertas y lo que corrigió el usuario. Es lo único del proyecto 
 - Delegá con la herramienta Agent (software-engineer, software-tester o software-documenter).
 - La descripción de cada delegación empieza con el rol y el número de tarea: `ING T1: <tarea>` para el
   software-engineer, `TEST T2: <tarea>` para el software-tester y `DOC T3: <tarea>` para el
-  software-documenter.
+  software-documenter. Si es un paso del flujo TDD, la tarea empieza con su tipo (`RED de Login`,
+  `GREEN de Login`, `verificar Login`, `merge del PR #12`), uno solo: el monitoreo compara el costo
+  contra las tareas del mismo tipo.
 
 ## Paralelismo
 - Podés lanzar varios agentes a la vez (varias llamadas a Agent en el mismo mensaje) solo si sus tareas
