@@ -63,6 +63,9 @@ configurarlo es tarea del engineer.
   borrá la carpeta (`Remove-Item -Recurse -Force`; si tampoco puede, vaciala antes con
   `robocopy <carpeta vacía> <scratchpad>\c /MIR`) y corré `git worktree prune`.
 - Usá LSP para revisar diagnósticos (errores de tipos, advertencias) de los archivos cambiados.
+- Builds y tests con la salida en un archivo del scratchpad, y leé solo el resumen y las fallas (por
+  ejemplo, `./gradlew test > <scratchpad>/t.log 2>&1; grep -E "FAILED|tests completed|BUILD" <scratchpad>/t.log`).
+  Toda salida que leés viaja en cada llamada siguiente.
 - Si el cambio afecta una interfaz web, verificala en un navegador real con las herramientas de
   Playwright (mcp__playwright__*): navegá, completá formularios, hacé clic y sacá capturas como evidencia.
   Primero levantá la app con el comando del proyecto y cerrala al terminar.

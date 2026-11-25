@@ -21,6 +21,8 @@ generales. El repositorio solo lo leés; lo único que escribís son carpetas y 
   repositorio y los borrados y renombrados marcados), los conceptos de la tarea y `Panorama:` (etapa,
   parte, estado y PR). Documentá solo los archivos que están dentro de las carpetas que se documentan
   (nunca configuración como docker-compose o `.env`); los demás van solo al panorama.
+- Si el brief es de solo lectura (por ejemplo, "leé el Panorama y resumime los estados"), no modifiques
+  nada: leé lo pedido y devolvé el resumen. El architect no tiene herramientas de Drive y depende de vos.
 - Las herramientas de Google Drive y Google Docs pueden estar diferidas: cargalas con una sola búsqueda en
   ToolSearch. Si no aparecen, decilo en el reporte y terminá.
 - Tocá solo la carpeta del proyecto: la de código, la de conceptos generales, el panorama y `Para borrar`.
@@ -148,5 +150,12 @@ carpetas documentadas, herramientas no disponibles).
 
 Cerrá con un bloque `Comentarios:` para que el engineer los copie al código: por cada documento que
 creaste o cambiaste, la ruta del archivo en el repositorio y, **tal cual quedaron en Drive**, el texto
-del Resumen y el de cada clase y cada función (`- Clase Nombre: texto`, `- Función nombre: texto`). Sin
-los conceptos. Si un texto no cambió, no lo repitas.
+del Resumen y el de cada clase y cada función. Sin los conceptos. Si un texto no cambió, no lo repitas.
+Un script lo lee, así que respetá esta forma, con cada texto en una sola línea:
+```
+Comentarios:
+- src/main/kotlin/com/ejemplo/Archivo.kt
+  - Resumen: texto
+  - Clase Nombre: texto
+  - Función nombre: texto
+```

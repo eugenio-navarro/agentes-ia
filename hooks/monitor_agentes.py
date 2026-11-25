@@ -81,7 +81,7 @@ def analizar_agente(jsonl, meta=None):
     """Resume una transcripción: tokens, modelos, pedidos, herramientas y fallas."""
     meta = meta or {}
     usos, modelos, herramientas = {}, set(), {}
-    pedidos, errores, tiempos = [], [], []
+    pedidos, errores, tiempos, salidas = [], [], [], []
     bloqueos = 0
     for fila in leer_jsonl(jsonl):
         if fila.get("timestamp"):
@@ -101,8 +101,9 @@ def analizar_agente(jsonl, meta=None):
             resultados = [b for b in content if isinstance(b, dict) and b.get("type") == "tool_result"] \
                 if isinstance(content, list) else []
             for r in resultados:
+                nombre, entrada = herramientas.get(r.get("tool_use_id"), ("", {}))
+                salidas.append((len(texto(r.get("content"))), nombre, entrada))
                 if r.get("is_error"):
-                    nombre, entrada = herramientas.get(r.get("tool_use_id"), ("", {}))
                     if "Bloqueado" in (texto(r.get("content")) or str(r.get("content"))):
                         bloqueos += 1
                     else:
@@ -135,6 +136,7 @@ def analizar_agente(jsonl, meta=None):
         "escritos": escritos,
         "inicio": min(tiempos) if tiempos else "",
         "herramientas": len(herramientas),
+        "salidas": sorted(salidas, key=lambda x: x[0], reverse=True)[:3],
     }
 
 
@@ -245,8 +247,18 @@ def senal_costo(a, historia):
     if a["tokens"] > UMBRALES["veces_mediana"] * mediana:
         return [("costo", f"gastó {a['tokens'] / mediana:.1f} veces lo de una tarea típica del mismo agente "
                           f"({miles(a['tokens'])} contra la mediana de {len(previos)} tareas de "
-                          f"{a['tipo']}: {miles(mediana)} tokens)")]
+                          f"{a['tipo']}: {miles(mediana)} tokens)" + salidas_grandes(a))]
     return []
+
+
+def salidas_grandes(a):
+    """Las salidas de herramienta más grandes: viajan en el contexto de cada llamada siguiente."""
+    partes = []
+    for largo, nombre, entrada in a.get("salidas", []):
+        if largo:
+            que = comando(entrada)[:60] or corto(entrada.get("file_path") or "") or nombre
+            partes.append(f"{nombre} `{que}` ({miles(largo)} caracteres)")
+    return "; salidas más grandes: " + ", ".join(partes) if partes else ""
 
 
 def git(*args):

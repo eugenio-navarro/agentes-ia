@@ -69,6 +69,17 @@ class Analisis(unittest.TestCase):
         self.assertEqual([c for c, _ in m.senal_costo(caro, historia)], ["costo"])
         self.assertEqual(m.senal_costo(caro, historia[:2]), [])  # pocas muestras: no compara
 
+    def test_el_aviso_de_costo_muestra_las_salidas_mas_grandes(self):
+        herramientas = [("Bash", {"command": "./gradlew test"}, None),
+                        ("Read", {"file_path": "C:/p/src/Grande.kt"}, None)]
+        a = m.analizar_agente(transcripcion(self.dir, ["ING T3: algo"], herramientas))
+        self.assertEqual([(n, largo) for largo, n, _ in a["salidas"]], [("Bash", 2), ("Read", 2)])
+        a.update(id="x", tipo="software-engineer", tokens=9000)
+        historia = [{"id": str(i), "tipo": "software-engineer", "tokens": 1000} for i in range(3)]
+        aviso = m.senal_costo(a, historia)[0][1]
+        self.assertIn("salidas más grandes: Bash `./gradlew test`", aviso)
+        self.assertIn("Grande.kt", aviso)
+
 
 class SenalesDeGit(unittest.TestCase):
     def setUp(self):

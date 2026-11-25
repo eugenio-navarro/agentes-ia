@@ -117,6 +117,9 @@ RUTAS_MEMORIA = [
     "~/.config/opencode/agent-memory/*",
     "*/.config/opencode/agent-memory/*",
     "*\\.config\\opencode\\agent-memory\\*",
+    # bloque `Comentarios:` del documenter, en el temporal (lo ubica hooks/ubicar_comentarios.py)
+    "*/Temp/*comentarios-T*.md",
+    "*\\Temp\\*comentarios-T*.md",
 ]
 
 # El engineer puede commitear en local, pero nunca publicar ni reescribir el historial.

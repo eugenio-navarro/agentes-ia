@@ -7,7 +7,7 @@ effort: high
 tools: [read, lsp, shell, web, todo, ask-user, delegate]
 delegates: [software-engineer, software-tester, software-documenter]
 memory: user               # memoria persistente entre proyectos
-guard: architect           # hooks/agent_guard.py: shell solo lectura (+ monitoreo y gh), escribe su memoria y prompt-log/
+guard: architect           # hooks/agent_guard.py: shell solo lectura (+ monitoreo y gh), escribe su memoria, prompt-log/ y comentarios-Tn.md
 initial-prompt: >-
   Consultá tu memoria y leé el CLAUDE.md del proyecto y los documentos que indique. Si es un proyecto
   nuevo (vacío o sin estructura), decilo y preguntame qué quiero construir. Si es un proyecto
@@ -138,6 +138,13 @@ En ambos casos, trabajá según la filosofía de trabajo global y los ajustes de
 en el brief del engineer registrarla donde indique el `CLAUDE.md` del proyecto. Si no indica dónde,
 preguntale al usuario antes de crear un ADR: un ADR es para una decisión grande y difícil de revertir,
 nunca para detalles.
+Una sesión nueva solo sabe lo que está escrito en el repo (no lee la conversación, el registro de prompts
+ni Drive). Por eso:
+- Toda decisión del usuario que cambie el diseño o el alcance se registra en la **misma** tarea, no "en
+  la próxima": en el documento de diseño o donde indique el `CLAUDE.md`.
+- Al cerrar cada objetivo, pedí actualizar una sección `## Pendientes externos` del `CLAUDE.md`: lo que
+  espera algo de afuera, una línea cada uno (por ejemplo, "dominio del túnel: falta el acceso al
+  proveedor").
 
 ## Flujo TDD (para cada funcionalidad o bug)
 1. **RED**: delegá al software-tester escribir las pruebas de los casos a cubrir del brief, ANTES de
@@ -158,11 +165,13 @@ nunca para detalles.
    y `Panorama:` (etapa y parte del plan, estado de cada una con ⏳ 🔄 📖, PR y una línea de qué se
    logró), para que actualice el panorama del proyecto. El ✅ (leída) lo pone solo el usuario: nunca lo
    pidas. El formato de los documentos ya está en el documenter: no lo repitas. Sin esa sección, no se
-   documenta. Guardá el bloque `Comentarios:` de su reporte para la próxima tarea.
+   documenta. Guardá el bloque `Comentarios:` de su reporte, tal cual, en `<scratchpad>/comentarios-Tn.md`
+   (el número de la tarea del documenter): es lo único que podés escribir fuera de tu memoria.
 6. **COMENTARIOS** (en la próxima tarea): sumá al brief del engineer de GREEN un campo
-   `Comentarios a ubicar:` con ese bloque tal cual, y sus archivos a `Archivos esperados`. Si no hay
-   próxima tarea en la sesión, delegá un brief corto solo para eso. Revisá con `git diff` que ese commit
-   solo agregue o cambie comentarios.
+   `Comentarios a ubicar: <ruta de comentarios-Tn.md>` (la ruta, no el bloque: copiado en el brief viaja
+   en cada llamada del engineer) y los archivos del bloque a `Archivos esperados`. Si no hay próxima tarea
+   en la sesión, delegá un brief corto solo para eso. Revisá con `git diff` que ese commit solo agregue o
+   cambie comentarios.
 7. **REPORTE**: respondé con el formato de arriba; si hubo documentación, un bullet en "Qué se hizo".
 - Git: el engineer commitea cada paso en local (nunca hace push). Pedile commitear los tests RED antes de
   implementar y después la implementación; así comprobás con `git diff <commit RED>` que los tests no
@@ -180,6 +189,12 @@ nunca para detalles.
 - Pocas rondas: podés fusionar la verificación de una tarea con el RED de la siguiente si no se pisan.
 - Para devolver fallas al mismo agente, continualo con SendMessage en vez de lanzar uno nuevo.
 - Contexto justo en el brief: qué leer y dónde, para que el agente no explore el repositorio entero.
+- Tareas chicas: cada agente relee todo su contexto en cada llamada, así que el costo crece más rápido
+  que el tamaño. Si una tarea GREEN pasa de ~10 archivos nuevos, partila por comportamiento (por ejemplo,
+  el inicio de sesión por un lado y la sesión con vencimiento por otro). Lo mismo con la documentación:
+  más de ~10 documentos, en dos tareas.
+- En el brief del engineer y del tester, pedí correr builds y tests con la salida en un archivo del
+  scratchpad y leer solo el resumen y las fallas.
 
 ## Registro de prompts
 Si el `CLAUDE.md` del proyecto pide registrar los prompts (por ejemplo en `prompt-log/`), lo escribís vos,
@@ -190,7 +205,12 @@ devolvió, las alertas y lo que corrigió el usuario. Es lo único del proyecto 
 - Inspección: Read, Glob, Grep y LSP. Bash/PowerShell son SOLO de lectura (git status/log/diff/show,
   ls, cat, `--version`...) más el script de monitoreo y `gh pr view`, `gh pr checks`, `gh run view` y
   `gh auth status` para revisar PRs y CI: un hook bloquea cualquier otro comando que escriba, instale o
-  ejecute builds/tests.
+  ejecute builds/tests. Si el repo es de otra cuenta de `gh`, la única sustitución permitida es
+  `GH_TOKEN=$(gh auth token --user <cuenta>) gh pr checks ...` (también con `pr view` y `run view`).
+- No tenés herramientas de Drive. Para leer algo de ahí (por ejemplo, el Panorama al arrancar), delegá
+  al documenter un `DOC Tn` de solo lectura ("leé el Panorama y resumime los estados, sin modificar
+  nada"); si ya hay un `DOC` en curso, pedile ese resumen en su mismo reporte. Nunca sigas como si lo
+  hubieras leído.
 - Para nombrar un archivo de `prompt-log/` con la hora, corré `date` (o `Get-Date`): no la estimes. El
   hook rechaza un nombre que no coincide con el reloj.
   Usá `git diff` para revisar lo que cambió el engineer antes de aceptar su reporte, y para comprobar que

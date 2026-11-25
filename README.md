@@ -31,7 +31,7 @@ del proyecto:
 
 | Comando | Cuándo |
 |---|---|
-| `python ~/.claude/hooks/monitor_agentes.py tarea --desde main` | Al cerrar una tarea: alertas de los agentes nuevos (relecturas, bloqueos, vueltas de corrección, archivos fuera del pedido, dependencias, tests de más o cambiados, costo contra la mediana, modelo) |
+| `python ~/.claude/hooks/monitor_agentes.py tarea --desde main` | Al cerrar una tarea: alertas de los agentes nuevos (relecturas, bloqueos, vueltas de corrección, archivos fuera del pedido, dependencias, tests de más o cambiados, costo contra la mediana con las 3 salidas más grandes, modelo) |
 | `python ~/.claude/hooks/monitor_agentes.py etapa --desde <commit>` | Al cumplir un objetivo: tokens por agente, tareas más caras y señales repetidas |
 
 ## El equipo
@@ -59,7 +59,7 @@ la carpeta del proyecto, y los documentos que sobran los mueve a `Para borrar`, 
 |---|---|
 | `FILOSOFIA.md` | Cómo se trabaja: principios, diseño, calidad y seguridad |
 | `agents/` | Un archivo por agente: configuración (modelo, permisos) + prompt |
-| `hooks/` | Scripts automáticos: el guard que impone los límites de cada rol, el formateador del engineer, el monitoreo del equipo (`monitor_agentes.py`) y el adaptador de los dos primeros para Codex (`codex_hooks.py`) |
+| `hooks/` | Scripts automáticos: el guard que impone los límites de cada rol, el formateador del engineer, el monitoreo del equipo (`monitor_agentes.py`), el que ubica en el código los comentarios del documenter (`ubicar_comentarios.py`) y el adaptador de los dos primeros para Codex (`codex_hooks.py`) |
 | `mods/` | Mods de Claude Code (cambios a su interfaz y comportamiento), cada uno con sus tests. Hoy: `context-saver` y `mapa-agentes` |
 | `extra/BITACORA.md` | Decisiones, limitaciones y fallas encontradas (lo mantiene la IA) |
 | `extra/INSTALAR.md` | Instrucciones para que una IA instale el equipo |

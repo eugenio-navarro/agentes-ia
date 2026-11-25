@@ -38,7 +38,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import instalar_opencode as base  # noqa: E402  (lectura del formato generico y AGENTS.md)
 
 REPO = base.REPO
-HOOKS = ("agent_guard.py", "format_on_edit.py", "codex_hooks.py")
+HOOKS = ("agent_guard.py", "format_on_edit.py", "codex_hooks.py", "ubicar_comentarios.py")
 MARCADOR_INICIO, MARCADOR_FIN = base.MARCADOR_INICIO, base.MARCADOR_FIN
 
 # Modelos por nivel, de la cuenta ChatGPT del usuario (`codex debug models`).
@@ -143,6 +143,7 @@ NOTA_TESTER = """
 def traducir_cuerpo(cuerpo):
     for viejo, nuevo in REEMPLAZOS:
         cuerpo = cuerpo.replace(viejo, nuevo)
+    cuerpo = cuerpo.replace("~/.claude/hooks/ubicar_comentarios.py", "~/.codex/hooks/ubicar_comentarios.py")
     return MONITOR.sub(SIN_MONITOR, cuerpo).strip("\n")
 
 

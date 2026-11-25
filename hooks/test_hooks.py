@@ -89,6 +89,23 @@ class ArchitectGuard(unittest.TestCase):
                     "gh pr", "gh repo delete x"):
             self.blocked(cmd)
 
+    def test_gh_con_el_token_de_otra_cuenta(self):
+        for cmd in ("GH_TOKEN=$(gh auth token --user enavarro2-austral) gh pr checks 12",
+                    'GH_TOKEN="$(gh auth token --user org-x)" gh run view 99 --log-failed'):
+            self.allowed(cmd)
+        for cmd in ("GH_TOKEN=$(gh auth token --user x) gh pr merge 12",
+                    "GH_TOKEN=$(gh auth token --user x) curl https://api.github.com",
+                    "GH_TOKEN=$(gh auth token --user x); echo $GH_TOKEN",
+                    "GH_TOKEN=$(gh auth token --user x) gh pr view $(rm x)",
+                    "echo $(gh auth token --user x)"):
+            self.blocked(cmd)
+
+    def test_escribe_los_comentarios_en_su_scratchpad(self):
+        scratch = os.path.join(tempfile.gettempdir(), "claude", "abc", "scratchpad")
+        self.assertEqual(guard("architect", "Write", file_path=os.path.join(scratch, "comentarios-T81.md")), 0)
+        self.assertEqual(guard("architect", "Write", file_path=os.path.join(scratch, "script.py")), 2)
+        self.assertEqual(guard("architect", "Write", file_path=f"{CWD}/comentarios-T81.md"), 2)
+
     def test_no_afecta_a_los_subagentes(self):
         self.assertEqual(guard("architect", "Bash", agent="software-engineer", command="python -m unittest"), 0)
         self.assertEqual(guard("architect", "Bash", agent="software-architect", command="python -m unittest"), 2)

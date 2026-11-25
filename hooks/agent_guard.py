@@ -39,6 +39,10 @@ VERSION_FLAGS = {"--version", "-v", "-V", "version", "--help", "-h"}
 # gh: solo lo que sirve para revisar un PR y su CI. `--show-token` / `-t` imprimen el token.
 GH_READ_ONLY = {("pr", "view"), ("pr", "checks"), ("run", "view"), ("auth", "status")}
 GH_SECRET_FLAGS = {"--show-token", "-t"}
+# Repo de una organización con otra cuenta de gh: `GH_TOKEN=$(gh auth token --user X) gh pr checks`.
+# Solo esta sustitución, pegada a un `gh` de lectura; el token nunca se imprime.
+GH_TOKEN_DE_CUENTA = re.compile(
+    r"""\bGH_TOKEN=(["']?)\$\(gh auth token --user [\w.-]+\)\1(?=[ \t]+gh[ \t])""")
 PYTHONS = {"python", "python3", "py"}
 MONITOR = "monitor_agentes.py"
 
@@ -102,6 +106,7 @@ def guard_architect(data):
     command = data.get("tool_input", {}).get("command", "")
     # harmless redirections of stderr/stdout to null
     cleaned = re.sub(r"\d?>\s*(&\d|/dev/null|\$null|NUL)\b", " ", command)
+    cleaned = GH_TOKEN_DE_CUENTA.sub("GH_TOKEN=cuenta", cleaned)
     if re.search(r">|\$\(|<\(|`", cleaned):
         deny("Bloqueado: el software-architect solo puede ejecutar comandos de "
              "lectura (sin redirecciones '>', sustituciones $() ni backticks). "
@@ -366,6 +371,10 @@ def check_log_time(destino):
              f"({now:%Y-%m-%d-%H%M}). No la estimes: corré `date` (o `Get-Date`) y usá esa hora.")
 
 
+# Bloque `Comentarios:` del documenter para el engineer (lo ubica hooks/ubicar_comentarios.py).
+COMENTARIOS = re.compile(r"^comentarios-t\d+\.md$")
+
+
 def guard_architect_files(data, memory_dir="~/.claude/agent-memory"):
     if data.get("tool_name") not in ("Edit", "Write", "NotebookEdit"):
         return
@@ -377,12 +386,15 @@ def guard_architect_files(data, memory_dir="~/.claude/agent-memory"):
     destino = to_abs(path, data.get("cwd", ""))
     if destino.startswith(memory):
         return
+    temporal = os.path.normcase(os.path.abspath(tempfile.gettempdir()))
+    if destino.startswith(temporal) and COMENTARIOS.match(os.path.basename(destino)):
+        return
     if LOG_DIR in re.split(r"[\\/]", destino.lower())[:-1]:
         check_log_time(destino)
         return
     deny("Bloqueado: el software-architect no edita archivos (solo su memoria en "
-         f"{memory_dir}/ y el registro en prompt-log/). Delegá el cambio al "
-         "software-engineer.")
+         f"{memory_dir}/, el registro en prompt-log/ y comentarios-Tn.md en su scratchpad). "
+         "Delegá el cambio al software-engineer.")
 
 
 def main():
