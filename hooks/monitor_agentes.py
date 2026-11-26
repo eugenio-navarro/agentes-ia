@@ -130,11 +130,15 @@ def analizar_agente(jsonl, meta=None):
             if not resultados and texto(content).strip():
                 pedidos.append(texto(content))
 
-    lecturas, escritos = Counter(), []
+    lecturas, lecturas_drive, escritos = Counter(), Counter(), []
     for nombre, entrada in herramientas.values():
         path = entrada.get("file_path") or entrada.get("notebook_path")
         if nombre == "Read" and path and not entrada.get("offset"):
             lecturas[path] += 1
+        elif nombre.endswith(("__read_doc", "__read_file_content")):
+            documento = entrada.get("documentId") or entrada.get("fileId")
+            if documento:
+                lecturas_drive[documento] += 1
         elif nombre in ESCRITURA and path:
             escritos.append(path)
 
@@ -152,6 +156,7 @@ def analizar_agente(jsonl, meta=None):
         "bloqueos": bloqueos,
         "errores": errores,
         "lecturas": lecturas,
+        "lecturas_drive": lecturas_drive,
         "escritos": escritos,
         "inicio": min(tiempos) if tiempos else "",
         "herramientas": len(herramientas),
@@ -305,7 +310,16 @@ def senal_costo(a, historia):
         texto += (f"; {a['llamadas']} llamadas (mediana {statistics.median(h['llamadas'] for h in con_llamadas):.0f})"
                   f" de {miles(por_llamada(a))} tokens cada una"
                   f" (mediana {miles(statistics.median(por_llamada(h) for h in con_llamadas))})")
-    return [("costo", texto + salidas_grandes(a))]
+    return [("costo", texto + relecturas_de_drive(a) + salidas_grandes(a))]
+
+
+def relecturas_de_drive(a):
+    """Documentos de Drive leídos más de una vez: el documenter tiene presupuesto de una lectura por documento."""
+    releidos = {d: n for d, n in (a.get("lecturas_drive") or {}).items() if n > 1}
+    if not releidos:
+        return ""
+    return (f"; releyó {len(releidos)} documento{'s' if len(releidos) > 1 else ''} de Drive "
+            f"({sum(releidos.values()) - len(releidos)} lecturas de más)")
 
 
 def salidas_grandes(a):

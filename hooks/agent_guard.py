@@ -11,6 +11,7 @@ import json
 import os
 import re
 import shlex
+import subprocess
 import sys
 import tempfile
 
@@ -166,7 +167,23 @@ def is_test_path(path, cwd=""):
            for p in parts[:-1]):
         return True
     return parts[-1] in GENERATED_DIRS or parts[-1] == ".coverage" or \
-        bool(TEST_FILE.search(parts[-1]))
+        bool(TEST_FILE.search(parts[-1])) or is_stray_screenshot(norm, cwd)
+
+
+IMAGE = re.compile(r"\.(png|jpe?g|webp)$", re.IGNORECASE)
+
+
+def is_stray_screenshot(norm, cwd):
+    """An untracked image right in the repo root: what Playwright MCP leaves with a relative filename."""
+    if not cwd or not IMAGE.search(norm) or os.path.dirname(norm) != to_abs(cwd):
+        return False
+
+    def git(*args):
+        return subprocess.run(["git", "-C", cwd, *args], capture_output=True, text=True)
+    top = git("rev-parse", "--show-toplevel")
+    if top.returncode != 0 or to_abs(top.stdout.strip()) != to_abs(cwd):
+        return False
+    return git("ls-files", "--error-unmatch", norm).returncode != 0
 
 
 def deny_tester(path):
@@ -240,6 +257,8 @@ def check_tester_segment(tokens, cwd):
 # The shell parsing below only follows what decides where a command writes: quotes, heredocs,
 # variables assigned in the same command (`S=<scratchpad>; ... > $S/x.log`) and `cd`. A variable
 # it cannot resolve stays as `$NAME`, which is never a test path, so it is blocked.
+# `$(cygpath -u 'C:\x')` is the same path written another way: it is replaced by the path itself.
+CYGPATH = re.compile(r"""\$\(\s*cygpath(?:\s+-[a-zA-Z]+)*\s+(?:'([^']*)'|"([^"$`]*)"|([^\s)'"$`]+))\s*\)""")
 HEREDOC = re.compile(r"<<-?[ \t]*(['\"]?)(\w+)\1([^\n]*)\n(?:.*?\n)?[ \t]*\2[ \t]*(?=\n|$)", re.DOTALL)
 VARIABLE = re.compile(r"\$(?:\{(\w+)\}|(\w+))")
 BASH_ASSIGNMENT = re.compile(r"^([A-Za-z_]\w*)=(.*)$", re.DOTALL)
@@ -382,6 +401,9 @@ def guard_tester(data):
         return
     powershell = data.get("tool_name") == "PowerShell"
     command = HEREDOC.sub(lambda m: m.group(3), ti.get("command", ""))  # heredoc bodies are data
+    if not powershell:
+        command = CYGPATH.sub(lambda m: next(g for g in m.groups() if g is not None).replace("\\", "/"),
+                              command)
     variables = {name: tempfile.gettempdir() for name in TEMP_VARIABLES}
     for seg in split_segments(command, powershell):
         seg = without_control(seg, powershell)

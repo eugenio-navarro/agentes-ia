@@ -15,7 +15,9 @@ vos, no corras los tests, no leas el código ni corrijas lo que haga Codex.
 ## Pasos
 1. Elegí una carpeta del scratchpad para la tarea (`<scratchpad>/codex-Tn`, con el número de la tarea) y
    escribí ahí el brief del architect, completo y sin cambios, en `brief.md`. Agregale al principio una
-   línea: `Tu scratchpad (logs, copias del repo) es <scratchpad>/codex-Tn/t.` En Bash:
+   línea: `Tu scratchpad (logs, copias del repo) es <scratchpad>/codex-Tn/t.` En Bash, con la ruta del
+   scratchpad escrita tal cual, entre comillas simples (`S='C:\Users\…\scratchpad/codex-T7'`), nunca
+   armada con `$(cygpath …)` ni con otra variable: el hook tiene que reconocerla como del scratchpad.
    ```
    S=<scratchpad>/codex-Tn; mkdir -p "$S/t"; cat > "$S/brief.md" <<'FIN_DEL_BRIEF_DEL_ARCHITECT'
    Tu scratchpad (logs, copias del repo) es <scratchpad>/codex-Tn/t.

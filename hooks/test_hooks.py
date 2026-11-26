@@ -137,8 +137,34 @@ class TesterGuard(unittest.TestCase):
         for cmd in (brief, lanzar, esperar):
             self.assertEqual(bash(cmd), 0, cmd)
         self.assertEqual(bash("echo x > src/main/kotlin/X.kt"), 2)
+        # P35: el puente armó la ruta con cygpath; con una ruta escrita es la misma, con una variable no.
+        w = s.replace("/", "\\")
+        self.assertEqual(bash(f"S=\"$(cygpath -u '{w}')/codex-T2\"; mkdir -p \"$S/t\"; "
+                              "cat > \"$S/brief.md\" <<'FIN'\nx\nFIN"), 0)
+        self.assertEqual(bash(f"S=$(cygpath -u {w}); echo x > \"$S/b.md\""), 0)
+        self.assertEqual(bash("S=\"$(cygpath -u \"$X\")\"; echo x > \"$S/b.md\""), 2)
+        self.assertEqual(bash("echo x > \"$(cygpath -u 'src/main/kotlin/X.kt')\""), 2)
         self.assertEqual(guard("tester", "Edit", agent="software-tester-codex",
                                file_path="src/main/kotlin/X.kt"), 2)
+
+    def test_borra_solo_capturas_sueltas_sin_trackear_de_la_raiz(self):
+        from unittest import mock
+        sys.path.insert(0, HERE)
+        import agent_guard
+        repo = tempfile.mkdtemp()
+        self.addCleanup(subprocess.run, ["cmd", "/c", "rmdir", "/s", "/q", repo] if os.name == "nt"
+                        else ["rm", "-rf", repo])
+        for args in (["init", "-q"], ["-c", "user.email=a@b", "-c", "user.name=a", "commit", "-q",
+                                      "--allow-empty", "-m", "x"]):
+            subprocess.run(["git", "-C", repo, *args], check=True)
+        open(os.path.join(repo, "logo.png"), "w").close()
+        subprocess.run(["git", "-C", repo, "add", "logo.png"], check=True)
+        # El repo queda fuera del temporal, que el tester puede escribir entero.
+        with mock.patch.object(agent_guard.tempfile, "gettempdir", return_value=os.path.join(os.sep, "sin-temporal")):
+            self.assertTrue(agent_guard.is_test_path("pagina-login.png", repo))
+            self.assertFalse(agent_guard.is_test_path("logo.png", repo))  # trackeada
+            self.assertFalse(agent_guard.is_test_path("src/main/resources/x.png", repo))  # no es la raíz
+            self.assertFalse(agent_guard.is_test_path("notas.md", repo))
 
     def test_edita_archivos_de_test(self):
         for p in ("src/test/kotlin/EsParTest.kt", "tests/test_math.py", "src/utils.test.ts",

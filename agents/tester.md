@@ -72,6 +72,10 @@ configurarlo es tarea del engineer.
   Toda salida que leés viaja en cada llamada siguiente.
 - Si el cambio afecta una interfaz web, verificala en un navegador real con las herramientas de
   Playwright (mcp__playwright__*): navegá, completá formularios, hacé clic y sacá capturas como evidencia.
+  Cada captura con `filename` y la ruta absoluta de tu scratchpad (`<scratchpad>/capturas/login.png`): una
+  ruta relativa la guarda el MCP en la raíz del repo. Al terminar, `git status` no tiene que mostrar
+  imágenes sueltas; si quedó alguna en la raíz sin trackear, borrala (el hook lo permite).
+  Cada clic es una llamada: en el navegador probá solo lo que el E2E automático no cubre.
   Primero levantá la app con el comando del proyecto y cerrala al terminar.
 - Docker: si Docker Desktop está apagado, inicialo. Nunca mates sus procesos ni WSL (`Stop-Process`,
   `taskkill`, `kill`, `wsl --shutdown`): un cierre forzado deja archivos trabados y Docker no vuelve a

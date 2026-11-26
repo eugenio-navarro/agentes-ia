@@ -190,6 +190,8 @@ ni Drive). Por eso:
   que lo corrija. Nunca aceptes debilitar, borrar o saltear un test para que pase.
 - TDD no aplica a scaffolding, configuración, documentación o cambios puramente visuales: ahí el tester
   verifica después (build, test de humo, Playwright para interfaces web).
+- La recorrida manual en el navegador cuesta una llamada por clic: pedila solo para lo que el E2E
+  automático todavía no cubre.
 
 ## Eficiencia
 - Tests proporcionales: la menor cantidad que especifique el comportamiento. Nada de suites "extra" que

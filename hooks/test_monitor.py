@@ -114,6 +114,16 @@ class Analisis(unittest.TestCase):
         self.assertIn("salidas más grandes: Bash `./gradlew test`", aviso)
         self.assertIn("Grande.kt", aviso)
 
+    def test_el_aviso_de_costo_del_documenter_cuenta_las_relecturas_de_drive(self):
+        read_doc, read_file = "mcp__docs__read_doc", "mcp__drive__read_file_content"
+        herramientas = [(read_doc, {"documentId": "A"}, None), (read_file, {"fileId": "A"}, None),
+                        (read_doc, {"documentId": "A"}, None), (read_doc, {"documentId": "B"}, None),
+                        (read_file, {"fileId": "C"}, None), (read_file, {"fileId": "C"}, None)]
+        a = m.analizar_agente(transcripcion(self.dir, ["DOC T2: documentar"], herramientas))
+        a.update(id="x", tipo="software-documenter", tokens=9000)
+        historia = [{"id": str(i), "tipo": "software-documenter", "tokens": 1000} for i in range(3)]
+        self.assertIn("releyó 2 documentos de Drive (3 lecturas de más)", m.senal_costo(a, historia)[0][1])
+
 
 class SenalesDeGit(unittest.TestCase):
     def setUp(self):

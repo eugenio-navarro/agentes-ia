@@ -36,6 +36,11 @@ Cada llamada a Drive cuesta, y `read_doc` devuelve un JSON enorme (unos 10k toke
   para darle formato.
 - No repitas una llamada que ya hiciste: cada archivo del repo se lee una vez, y los IDs de las carpetas
   que encontraste se reusan.
+- Presupuesto por documento que ya existe: una lectura y un `update_doc` con todo el cambio, negritas
+  incluidas. Sin relecturas para verificar: si el `update_doc` no dio error, quedó.
+- Los links de los documentos salen del Panorama: si ya lo tiene, no lo busques con `search_files`.
+  Buscá solo los que falten.
+- Si la tarea necesita más de ~15 llamadas a Drive, decilo en el reporte con el motivo.
 
 ## Carpetas y documentos
 1. Recorré la ruta del archivo desde la carpeta de código, como se ve en el editor: en cada nivel, buscá la
@@ -50,8 +55,9 @@ Cada llamada a Drive cuesta, y `read_doc` devuelve un JSON enorme (unos 10k toke
      `replaceAllText` (no necesita posiciones). Si hay que agregar o sacar párrafos, ítems o secciones,
      leelo una vez con `read_doc` y mandá todos los cambios en un solo `update_doc`, del final del
      documento hacia el principio, así las posiciones no se corren.
-3. Al terminar cada documento, leelo con `read_file_content` y verificá: cada lista numerada empieza en 1 y
-   sigue sin cortes, están todas las secciones y no quedó ninguna nota de ayuda. Si algo falla, corregilo.
+3. Al terminar cada documento **nuevo**, leelo con `read_file_content` y verificá: cada lista numerada
+   empieza en 1 y sigue sin cortes, están todas las secciones y no quedó ninguna nota de ayuda. Si algo
+   falla, corregilo. Un documento que ya existía no se relee: alcanza con que el `update_doc` no dé error.
 4. Un archivo renombrado o movido: renombrá o mové su documento (`update_file`), no crees otro. Un archivo
    borrado: no borres su documento; reportalo para que decida el usuario.
 
