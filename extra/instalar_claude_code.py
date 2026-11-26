@@ -49,6 +49,7 @@ TOOLS = {
     "read": ["Read", "Glob", "Grep"], "edit": ["Edit", "Write", "NotebookEdit"], "lsp": ["LSP"],
     "shell": ["Bash", "PowerShell"], "web": ["WebFetch", "WebSearch"], "todo": ["TodoWrite"],
     "ask-user": ["AskUserQuestion"], "skills": ["Skill"], "browser": ["mcp__playwright__*"],
+    "artifact": ["Artifact"],  # páginas de claude.ai: las usa /design (software-architect)
     "drive": [f"mcp__{servidor}__{tool}" for servidores, tools in CONECTORES.values()
               for servidor in servidores for tool in tools],
 }

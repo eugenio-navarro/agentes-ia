@@ -101,7 +101,8 @@ actualiza; no se repite.
 Al terminar, actualizá el documento "Panorama del proyecto" de la carpeta del proyecto (buscalo por título
 en esa carpeta) con el `Panorama:` del brief. Ya existe y lo armó el usuario: nunca lo crees de nuevo. Si
 no está, reportalo.
-- Respetá cómo está armado: leelo con `read_file_content` y seguí el formato que ya tiene (encabezados,
+- Respetá cómo está armado: leelo una sola vez, con `read_doc`, que trae el texto y las posiciones para
+  editarlo (no lo leas antes con `read_file_content`), y seguí el formato que ya tiene (encabezados,
   ítems, el patrón de los links a GitHub y a Drive, cómo marca la configuración).
 - Cambiá solo lo de esta tarea: el estado de la etapa (en la tabla y en su encabezado) y el de la parte,
   la línea de qué se logró si la parte la tiene, y un ítem por archivo de la tarea, con su link a GitHub y
@@ -114,7 +115,29 @@ no está, reportalo.
   en el documento están bien; no los "corrijas".
 - Todo el panorama se actualiza con un `read_doc` y **un solo** `update_doc` que lleva todos los cambios
   juntos (estados, textos y todos los ítems con sus links), del final hacia el principio: nunca una
-  llamada por link o por ítem. Al final, verificalo con `read_file_content`.
+  llamada por link o por ítem. Para verificar, alcanza con que el `update_doc` no dé error: releer el
+  documento entero duplica el costo. Solo si está partido (abajo), releé con `read_file_content` lo que
+  editaste.
+
+### Panorama partido por etapa
+El panorama crece con cada tarea, y leerlo entero cuesta en cada llamada siguiente (`read_doc` trae
+siempre el documento completo). Por eso se parte:
+- **"Panorama del proyecto"** queda como índice: la tabla de etapas, con el estado y el link al
+  documento de cada etapa.
+- **Un documento por etapa**, en la misma carpeta, titulado "Panorama - Etapa N: <nombre>", con sus
+  partes y archivos.
+
+Si ya está partido, leé solo el índice y el documento de la etapa del brief, nunca los de otras etapas.
+Hacé un `update_doc` en cada uno y verificá leyendo solo esos dos.
+
+Si todavía es un solo documento, actualizalo como dice arriba y avisá en el reporte cuántos caracteres
+tiene. Partilo solo si el brief dice `Partir el Panorama` (lo decide el usuario). Así conservás el
+formato y los links del usuario:
+1. Por cada etapa, una copia del documento (`copy_file`) con el título de esa etapa. En cada copia,
+   borrá lo que no es de esa etapa, en un solo `update_doc`.
+2. En el original, dejá la tabla y cambiá el detalle de cada etapa por el link a su documento.
+3. No borres nada más ni muevas nada a `Para borrar`. En el reporte, poné el link de cada documento
+   nuevo.
 
 ## Correcciones
 Los errores de nombres que encuentres, en los documentos que tocás o en sus carpetas, los corregís vos sin
@@ -151,7 +174,8 @@ carpetas documentadas, herramientas no disponibles).
 Cerrá con un bloque `Comentarios:` para que el engineer los copie al código: por cada documento que
 creaste o cambiaste, la ruta del archivo en el repositorio y, **tal cual quedaron en Drive**, el texto
 del Resumen y el de cada clase y cada función. Sin los conceptos. Si un texto no cambió, no lo repitas.
-Un script lo lee, así que respetá esta forma, con cada texto en una sola línea:
+Las migraciones versionadas (`db/migration/V7__x.sql`) no van en el bloque: una vez aplicadas no se
+cambian, ni un comentario. Su documento sale del archivo tal como está, nunca al revés. Un script lo lee, así que respetá esta forma, con cada texto en una sola línea:
 ```
 Comentarios:
 - src/main/kotlin/com/ejemplo/Archivo.kt

@@ -19,6 +19,7 @@ mayúscula. Formatos:
 - kdoc (por defecto): el Resumen como `/* … */` y el resto como KDoc `/** … */`.
 - barras: un `//` por oración si cada una entra en la línea; si no, un bloque `/* … */` sin asteriscos.
   Nunca los dos mezclados en un mismo comentario.
+Nunca toca una migración versionada (`db/migration/`, `V7__x.sql`): lo avisa y la saltea.
 Solo entiende Kotlin; lo que no puede ubicar (otro lenguaje, una declaración que no encuentra o que
 aparece más de una vez) lo lista para hacerlo a mano. No es un hook: lo corre el engineer, así el bloque
 no viaja en su contexto.
@@ -40,8 +41,16 @@ EXTENSIONES = (".kt", ".kts")
 FORMATOS = ("kdoc", "barras")
 
 
+MIGRACION = re.compile(r"(^|/)db/migrations?/|(^|/)V\d+(_\d+)*__\w+\.sql$", re.IGNORECASE)
+
+
 class FormatoInvalido(ValueError):
     pass
+
+
+def es_migracion(ruta):
+    """Una migración versionada (`db/migration/V7__x.sql`) ya aplicada no se cambia, ni un comentario."""
+    return bool(MIGRACION.search(ruta.replace("\\", "/")))
 
 
 def leer_bloque(texto):
@@ -82,7 +91,9 @@ def comentario(texto, sangria, kdoc, formato="kdoc"):
         oraciones = ORACION.split(texto)
         if all(len(sangria) + 3 + len(o) <= ANCHO for o in oraciones):
             return [f"{sangria}// {o}" for o in oraciones]
-        return [sangria + "/*"] + [sangria + l for l in envolver(texto, ANCHO - len(sangria))] + [sangria + "*/"]
+        # ktlint alinea el `*/` con el `*` de `/*`: en código sangrado va una columna a la derecha
+        cierre = sangria + (" */" if sangria else "*/")
+        return [sangria + "/*"] + [sangria + l for l in envolver(texto, ANCHO - len(sangria))] + [cierre]
     cuerpo = [f"{sangria} * {l}" for l in envolver(texto, ANCHO - len(sangria) - 3)]
     return [sangria + ("/**" if kdoc else "/*")] + cuerpo + [sangria + " */"]
 
@@ -182,6 +193,10 @@ def main(argv):
             return 2
     a_mano = 0
     for ruta, entradas in bloque.items():
+        if es_migracion(ruta):
+            print(f"- {ruta}: es una migración versionada; no la toqué y no se toca, ni sus comentarios "
+                  "(Flyway valida el checksum del archivo entero). El texto de Drive sale del archivo.")
+            continue
         if not ruta.endswith(EXTENSIONES):
             print(f"- {ruta}: no es Kotlin; ubicá sus {len(entradas)} comentarios a mano")
             a_mano += len(entradas)

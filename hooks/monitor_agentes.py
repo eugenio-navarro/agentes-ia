@@ -77,12 +77,29 @@ def comando(entrada):
     return (entrada.get("command") or "").strip()
 
 
+def motivo_del_bloqueo(salida):
+    """La primera oración del mensaje del hook: "'$t' no parece un archivo de prueba"."""
+    m = re.search(r"Bloqueado:\s*(.*?)(?:\.\s|\.?$)", salida, re.DOTALL)
+    motivo = " ".join((m.group(1) if m else salida).split())
+    return motivo[:120] + ("…" if len(motivo) > 120 else "")
+
+
+def sin_temporal(texto_):
+    """Acorta la carpeta temporal (`C:\\Users\\x\\AppData\\Local\\Temp`, `/c/Users/...`) a `<temp>`, y el
+    scratchpad de una sesión a `<scratchpad>`: así se ve el comando y no la ruta."""
+    temporal = tempfile.gettempdir()
+    unix = re.sub(r"^([A-Za-z]):", lambda d: "/" + d.group(1).lower(), temporal.replace("\\", "/"))
+    for forma in (temporal, temporal.replace("\\", "/"), unix):
+        texto_ = re.sub(re.escape(forma), "<temp>", texto_, flags=re.IGNORECASE)
+    return re.sub(r"<temp>[\\/]claude[\\/][^\\/\s'\"]+[\\/][^\\/\s'\"]+[\\/]scratchpad", "<scratchpad>", texto_)
+
+
 def analizar_agente(jsonl, meta=None):
     """Resume una transcripción: tokens, modelos, pedidos, herramientas y fallas."""
     meta = meta or {}
     usos, modelos, herramientas = {}, set(), {}
     pedidos, errores, tiempos, salidas = [], [], [], []
-    bloqueos = 0
+    bloqueos = []
     for fila in leer_jsonl(jsonl):
         if fila.get("timestamp"):
             tiempos.append(fila["timestamp"])
@@ -104,8 +121,10 @@ def analizar_agente(jsonl, meta=None):
                 nombre, entrada = herramientas.get(r.get("tool_use_id"), ("", {}))
                 salidas.append((len(texto(r.get("content"))), nombre, entrada))
                 if r.get("is_error"):
-                    if "Bloqueado" in (texto(r.get("content")) or str(r.get("content"))):
-                        bloqueos += 1
+                    salida = texto(r.get("content")) or str(r.get("content"))
+                    if "Bloqueado" in salida:
+                        bloqueos.append((nombre, comando(entrada) or entrada.get("file_path") or "",
+                                         motivo_del_bloqueo(salida)))
                     else:
                         errores.append((nombre, comando(entrada)))
             if not resultados and texto(content).strip():
@@ -224,7 +243,10 @@ def senales_agente(a, esperado=None):
         if n >= UMBRALES["relecturas"]:
             s.append(("relectura", f"leyó {corto(path)} entero {n} veces"))
     if a["bloqueos"]:
-        s.append(("bloqueo", f"el hook lo bloqueó {veces(a['bloqueos'])}"))
+        nombre, cmd, motivo = (sin_temporal(x) for x in a["bloqueos"][-1])
+        cmd = " ".join(cmd.split())
+        s.append(("bloqueo", f"el hook lo bloqueó {veces(len(a['bloqueos']))}; el último, "
+                             f"{nombre} `{cmd[:70]}{'…' if len(cmd) > 70 else ''}`: {motivo}"))
     if a["pedidos"] - 1 > UMBRALES["correcciones"]:
         s.append(("correcciones", f"necesitó {a['pedidos'] - 1} vueltas de corrección"))
     for cmd, n in Counter(c for _, c in a["errores"] if c).items():
@@ -246,11 +268,14 @@ TIPOS_DE_TAREA = {
     "GREEN": re.compile(r"\bgreen\b|\bimplement", re.IGNORECASE),
     "verificación": re.compile(r"verific", re.IGNORECASE),
     "merge": re.compile(r"\bmerge|\bmergear|\bintegrar", re.IGNORECASE),
+    "comentarios": re.compile(r"\bcomentario", re.IGNORECASE),
 }
 
 
 def tipo_de_tarea(a):
     tipos = [t for t, patron in TIPOS_DE_TAREA.items() if patron.search(a.get("descripcion") or "")]
+    if tipos == ["merge", "comentarios"]:  # el brief corto que ubica los comentarios junto con el merge
+        return "merge y comentarios"
     return tipos[0] if len(tipos) == 1 else None
 
 

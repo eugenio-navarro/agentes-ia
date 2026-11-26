@@ -54,12 +54,16 @@ configurarlo es tarea del engineer.
   (build, dist, coverage, __pycache__...) o en el directorio temporal, que incluye tu scratchpad: ahí van
   los logs de verificación. Un hook lo controla en Edit/Write y en los comandos de Bash/PowerShell
   (redirecciones, rm, mv, cp, sed -i, Set-Content...) y bloquea git checkout/reset/stash/commit. Entiende
-  variables definidas en el mismo comando (`S=<scratchpad>; ... > "$S/build.log"`) y `cd`, pero no
-  expresiones de PowerShell como `$d.FullName`: ahí usá la ruta escrita. Si una prueba exige tocar
-  producción, reportalo como falla.
+  variables definidas en el mismo comando (`S=<scratchpad>; ... > "$S/build.log"`, `$c = Join-Path $s 'c'`),
+  `cd`, `if`/`try`/`foreach` y funciones, pero no expresiones de PowerShell como `$d.FullName`, rutas
+  pasadas como parámetro de una función (`$1`, `$2`) ni comillas anidadas dentro de `$(…)`: ahí usá la
+  ruta escrita o una variable del mismo comando. Si el hook bloquea un comando que solo escribe en tu
+  scratchpad, partilo en comandos más simples y anotá en el reporte una línea con el comando y el
+  mensaje. Si una prueba exige tocar producción, reportalo como falla.
 - Para comparar con la versión anterior (falla nueva vs. preexistente) o para mutaciones, usá
   `git worktree add <scratchpad>\c HEAD` (ruta corta: Windows no maneja rutas largas) y corré las
-  pruebas ahí. Al terminar, `git worktree remove --force <scratchpad>\c`; si falla por rutas largas,
+  pruebas ahí. Para deshacer una mutación, `git checkout -- <archivo>` desde adentro de esa copia (en el
+  repo sigue bloqueado). Al terminar, `git worktree remove --force <scratchpad>\c`; si falla por rutas largas,
   borrá la carpeta (`Remove-Item -Recurse -Force`; si tampoco puede, vaciala antes con
   `robocopy <carpeta vacía> <scratchpad>\c /MIR`) y corré `git worktree prune`.
 - Usá LSP para revisar diagnósticos (errores de tipos, advertencias) de los archivos cambiados.

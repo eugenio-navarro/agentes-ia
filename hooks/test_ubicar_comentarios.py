@@ -55,6 +55,39 @@ class Bloque(unittest.TestCase):
                 u.leer_bloque(malo)
 
 
+class Migraciones(unittest.TestCase):
+    def test_reconoce_las_migraciones_versionadas(self):
+        for ruta in ("src/main/resources/db/migration/V7__lecturas_de_kilometros.sql",
+                     "db\\migration\\V1__inicio.sql", "sql/V2_1__x.sql"):
+            self.assertTrue(u.es_migracion(ruta), ruta)
+        for ruta in ("src/main/kotlin/x/Migrar.kt", "docs/V7.md"):
+            self.assertFalse(u.es_migracion(ruta), ruta)
+
+    def test_no_toca_una_migracion(self):
+        import io
+        import tempfile
+        from contextlib import redirect_stdout
+        with tempfile.TemporaryDirectory() as d:
+            ruta = os.path.join(d, "db", "migration", "V7__x.sql")
+            os.makedirs(os.path.dirname(ruta))
+            with open(ruta, "w", encoding="utf-8") as f:
+                f.write("-- viejo\nCREATE TABLE x ();\n")
+            bloque = os.path.join(d, "comentarios-T1.md")
+            with open(bloque, "w", encoding="utf-8") as f:
+                f.write("Comentarios:\n- db/migration/V7__x.sql\n  - Resumen: nuevo.\n")
+            salida, antes = io.StringIO(), os.getcwd()
+            os.chdir(d)  # el script corre desde la raíz del repo
+            try:
+                with redirect_stdout(salida):
+                    codigo = u.main([bloque])
+            finally:
+                os.chdir(antes)
+            with open(ruta, encoding="utf-8") as f:
+                self.assertEqual(f.read(), "-- viejo\nCREATE TABLE x ();\n")
+            self.assertEqual(codigo, 0)
+            self.assertIn("migración versionada", salida.getvalue())
+
+
 class Kdoc(unittest.TestCase):
     def test_ubica_resumen_clases_y_funciones(self):
         nuevo, pendientes = u.ubicar(CODIGO, entradas())
@@ -103,9 +136,14 @@ class Barras(unittest.TestCase):
         largo = "esta oración es larga " * 8 + "y no entra. Esta sí."
         nuevo, _ = u.ubicar("class A {\n    fun f() {}\n}\n", [["funcion", "f", largo]], "barras")
         self.assertIn("    /*\n    Esta oración es larga", nuevo)
-        self.assertIn("Esta sí.\n    */\n    fun f()", nuevo)
+        self.assertIn("Esta sí.\n     */\n    fun f()", nuevo)  # `*/` una columna a la derecha (ktlint)
         self.assertNotIn("//", nuevo)
         self.assertTrue(all(len(l) <= u.ANCHO for l in nuevo.splitlines()))
+
+    def test_bloque_sin_sangria_cierra_en_la_columna_cero(self):
+        nuevo, _ = u.ubicar("class A\n", [["clase", "A", "palabra " * 30]], "barras")
+        self.assertIn("\n*/\nclass A", nuevo)
+        self.assertEqual(u.ubicar(nuevo, [["clase", "A", "palabra " * 30]], "barras")[0], nuevo)
 
     def test_reemplaza_cualquier_formato_anterior_sin_duplicar(self):
         una, _ = u.ubicar(CODIGO, entradas(), "barras")  # desde KDoc

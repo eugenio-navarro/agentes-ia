@@ -106,6 +106,11 @@ class ArchitectGuard(unittest.TestCase):
         self.assertEqual(guard("architect", "Write", file_path=os.path.join(scratch, "script.py")), 2)
         self.assertEqual(guard("architect", "Write", file_path=f"{CWD}/comentarios-T81.md"), 2)
 
+    def test_escribe_la_pagina_de_design_solo_en_su_scratchpad(self):
+        scratch = os.path.join(tempfile.gettempdir(), "claude", "abc", "scratchpad")
+        self.assertEqual(guard("architect", "Write", file_path=os.path.join(scratch, "pantallas.html")), 0)
+        self.assertEqual(guard("architect", "Write", file_path=f"{CWD}/web/index.html"), 2)
+
     def test_no_afecta_a_los_subagentes(self):
         self.assertEqual(guard("architect", "Bash", agent="software-engineer", command="python -m unittest"), 0)
         self.assertEqual(guard("architect", "Bash", agent="software-architect", command="python -m unittest"), 2)
@@ -170,6 +175,43 @@ class TesterGuard(unittest.TestCase):
                     "echo x > $DESCONOCIDA/main.py", "S=src; rm $S/main.py",
                     "cd src && echo x > main.py"):
             self.assertEqual(self.bash(cmd), 2, cmd)
+
+    def ps(self, command):
+        return guard("tester", "PowerShell", agent="software-tester", command=command)
+
+    def test_mutaciones_y_limpieza_de_la_copia_reales(self):
+        """Comandos de TEST T86, T97, T104, T109 y T119 que el hook bloqueaba sin motivo."""
+        scratch = os.path.join(tempfile.gettempdir(), "claude", "abc", "scratchpad")
+        s = scratch.replace("\\", "/")
+        bash = (f'S="{s}"; C="$S/c"; M="$C/src/main/kotlin/x"\n'
+                'restore() { cp "$S/orig/A.kt" "$M/model/A.kt"; }\n'
+                'run() { (cd "$C" && ./gradlew test > "$S/mut-$1.log" 2>&1); grep BUILD "$S/mut-$1.log"; }\n'
+                "restore; sed -i -e 's/val a = 1/val a = 2/' \"$M/model/A.kt\"; run d; restore\n"
+                f'for f in "$M/a.kt" "$M/b.kt"; do sed -i "/x/d" "$f"; done')
+        self.assertEqual(self.bash(bash), 0)
+        self.assertEqual(self.bash(f'cd "{s}/c" && sed -i -e "/CHECK (x)/d" -e "s/a,/a/" src/V4.sql'), 0)
+        self.assertEqual(self.bash(f'cd "{s}/c" && sed -i "s/a/b/" src/A.kt && git checkout -- src/A.kt'), 0)
+        self.assertEqual(self.bash("git checkout -- src/A.kt"), 2)  # en el repo, no
+        for ps in (f"$base = '{scratch}'; $vacio = Join-Path $base 'vacio'; $c = Join-Path $base 'c'; "
+                   "robocopy $vacio $c /MIR | Out-Null; Remove-Item -LiteralPath $c -Recurse -Force",
+                   f"$w = '{scratch}\\c'; try {{ Remove-Item -LiteralPath $w -Recurse -Force }} catch {{ 'x' }}; "
+                   f"if (Test-Path -LiteralPath $w) {{ $empty = '{scratch}\\vacio'; "
+                   "New-Item -ItemType Directory -Force -Path $empty | Out-Null }",
+                   f"$base = '{scratch}'; foreach ($t in @(\"$base\\r\", \"$base\\c\")) "
+                   "{ if (Test-Path $t) { Remove-Item -Recurse -Force $t } }"):
+            self.assertEqual(self.ps(ps), 0, ps)
+
+    def test_el_control_no_esconde_produccion(self):
+        for cmd in ("if true; then rm src/main.py; fi", "for f in a; do rm src/main.py; done",
+                    "f() { rm src/main.py; }", "(rm src/main.py)", "for f in src/a.kt; do rm $f; done",
+                    "c() { sed -i 's/a/b/' \"$2\"; }; c x src/a.kt",
+                    "sed -i -e 's/a/b/' src/main/A.kt"):
+            self.assertEqual(self.bash(cmd), 2, cmd)
+        for ps in ("try { Remove-Item src -Recurse } catch { 'x' }",
+                   "if (Test-Path src) { Remove-Item src -Recurse }",
+                   "$p = Join-Path 'src' 'main'; Remove-Item $p",
+                   "foreach ($t in @('src', 'C:\\Windows')) { Remove-Item $t }"):
+            self.assertEqual(self.ps(ps), 2, ps)
 
     def test_un_mayor_entre_comillas_no_es_una_redireccion(self):
         for cmd in ("grep -o '<testsuite [^>]*>' build/test-results/a.xml | head -1",

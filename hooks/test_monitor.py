@@ -55,6 +55,26 @@ class Analisis(unittest.TestCase):
         self.assertIn("Ayudante.kt", fuera)
         self.assertNotIn("Moto.kt", fuera)
 
+    def test_el_bloqueo_dice_que_comando_y_por_que(self):
+        herramientas = [("Bash", {"command": "rm a"}, "Bloqueado: 'a' no parece un archivo de prueba. El ..."),
+                        ("PowerShell", {"command": "$b = Join-Path $s 'c'\nRemove-Item $b"},
+                         "PreToolUse:PowerShell hook error: [command hook 2]: Bloqueado: '$b' no parece un "
+                         "archivo de prueba. El software-tester NO modifica")]
+        a = m.analizar_agente(transcripcion(self.dir, ["TEST T1: verificar X"], herramientas))
+        aviso = dict(m.senales_agente(a))["bloqueo"]
+        self.assertEqual(aviso, "el hook lo bloqueó 2 veces; el último, PowerShell "
+                                "`$b = Join-Path $s 'c' Remove-Item $b`: '$b' no parece un archivo de prueba")
+
+    def test_acorta_el_scratchpad(self):
+        s = os.path.join(tempfile.gettempdir(), "claude", "ab12", "c-d", "scratchpad")
+        self.assertEqual(m.sin_temporal(f"S='{s}'; x > {s.replace(os.sep, '/')}/a.log"),
+                         "S='<scratchpad>'; x > <scratchpad>/a.log")
+
+    def test_merge_y_comentarios_es_un_tipo_propio(self):
+        self.assertEqual(m.tipo_de_tarea({"descripcion": "ING T105: merge del PR #14 y comentarios"}),
+                         "merge y comentarios")
+        self.assertEqual(m.tipo_de_tarea({"descripcion": "ING T95: merge del PR #13"}), "merge")
+
     def test_sin_senales_no_avisa(self):
         a = m.analizar_agente(transcripcion(self.dir, ["TEST T2: tests"], [
             ("Read", {"file_path": "a.kt"}, None), ("Write", {"file_path": "src/test/kotlin/ATest.kt"}, None)]))

@@ -15,6 +15,9 @@ existentes. Limitá los cambios al alcance acordado y no reviertas trabajo ajeno
 Implementá una solución simple, mantenible y segura: lo que pide el brief y nada más. Sin abstracciones,
 parámetros, configuraciones ni generalizaciones "por si acaso"; sin dependencias nuevas que el brief no
 autorice. Tocá solo los archivos esperados del brief; si necesitás otro, decilo en el reporte con el motivo.
+Una migración versionada ya mergeada (por ejemplo, `db/migration/V7__x.sql`) no se cambia nunca, ni un
+comentario: Flyway valida el checksum del archivo entero y el arranque falla en toda BD que ya la aplicó.
+Un cambio de estructura va en una migración nueva. Si el brief pide tocar una, no lo hagas: reportalo.
 Actualizá pruebas o documentación solo cuando el cambio lo requiera. Ejecutá la validación más específica
 disponible (pruebas, lint, build o type-check), corregí fallas causadas por tu cambio y no dejes warnings
 nuevos.
@@ -36,7 +39,8 @@ del repo. El formato es el que fije el `CLAUDE.md` del proyecto: `barras` (un `/
 una entra en la línea; si no, un bloque `/* … */` sin asteriscos) o `kdoc` (`/** … */`) si no dice nada.
 El script los ubica en Kotlin con las reglas de abajo y lista lo que quedó para hacer a mano (otro
 lenguaje, una declaración que no encontró o que está repetida): para eso, buscá en el archivo solo esa
-línea (Grep). Si rechaza el bloque por una línea fuera de formato, no lo corrijas vos: reportalo.
+línea (Grep). Si rechaza el bloque por una línea fuera de formato, no lo corrijas vos: reportalo. Las
+migraciones versionadas las saltea y lo avisa: no las ubiques a mano.
 Después corré el formateador y el linter del proyecto, porque el script no dispara el hook.
 Reglas, para lo que ubiques a mano: copialos **tal cual**, en español aunque el código esté en otro
 idioma, con el formato de comentarios del proyecto (KDoc `/** … */` en Kotlin si no dice nada). No

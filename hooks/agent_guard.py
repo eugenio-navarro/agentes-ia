@@ -192,18 +192,24 @@ REDIRECT_TOKEN = re.compile(r"^\d?>")  # `2>/dev/null` glued to its target: redi
 
 
 def check_tester_segment(tokens, cwd):
+    tokens = [t for t in tokens if t not in ("{", "}", "(", ")")]  # `try { Remove-Item x }`
     while tokens and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", tokens[0]):
         tokens = tokens[1:]
     if not tokens:
         return
     cmd = re.sub(r"\.exe$", "", os.path.basename(tokens[0]).lower())
     args = [a for a in tokens[1:] if not REDIRECT_TOKEN.match(a)]
-    positional = [a for a in args if not a.startswith("-")]
+    # the value after `sed -e`/`-f` is a script, not a file (`sed -i -e 's/a/b/' x.kt`)
+    positional = [a for i, a in enumerate(args) if not a.startswith("-")
+                  and not (cmd in ("sed", "perl") and i > 0 and args[i - 1] in ("-e", "-f"))]
 
     if cmd == "git":
         while args and args[0].startswith("-"):
             args = args[2:] if args[0] in ("-C", "-c") else args[1:]
         sub = args[0] if args else ""
+        if sub in ("checkout", "restore") and cwd \
+                and to_abs(cwd).startswith(os.path.normcase(os.path.abspath(tempfile.gettempdir()))):
+            return  # undoing a mutation in its copy of the scratchpad does not touch the repository
         if sub in GIT_MUTATING or (sub == "stash" and args[1:2] not in (["list"], ["show"])):
             deny(f"Bloqueado: 'git {sub}' modifica el árbol de trabajo o el historial. "
                  "El software-tester no altera el repositorio; para comparar con la "
@@ -265,11 +271,12 @@ def scan(text, powershell, on_char):
 
 
 def split_segments(command, powershell):
-    """Splits on `;`, `|`, `&&`, `||` and newlines that are outside quotes."""
+    """Splits on `;`, `|`, `&&`, `||` and newlines that are outside quotes (and `{`, `}` in PowerShell,
+    where a block ends a statement: `try { Remove-Item x } catch { 'y' }`)."""
     cuts = []
 
     def on_char(i, c):
-        if c in ";|\n" or command.startswith("&&", i):
+        if c in ";|\n" or (powershell and c in "{}") or command.startswith("&&", i):
             cuts.append(i)
             return 1 if command.startswith(("&&", "||"), i) else 0
         return 0
@@ -316,6 +323,53 @@ def tokenize(segment, powershell):
     return [t.strip("'\"") for t in tokens] if powershell else tokens
 
 
+# Control words in front of a command (`try { Remove-Item x`, `do rm x`, `f() { cp a b`): they are
+# dropped so the command behind them is checked, and so are the assignments behind them.
+PS_CONTROL = re.compile(r"^\s*(?:(?:try|else|finally|do)\b\s*\{?|catch\b\s*(?:\[[^\]]*\]\s*)?\{?|[{}]"
+                        r"|(?:if|elseif|while|switch)\s*\((?:[^()]|\([^()]*\))*\)\s*\{?)\s*", re.IGNORECASE)
+BASH_CONTROL = re.compile(r"^\s*(?:(?:do|then|else|elif|if|while|until|time|!)\s+|[{(]\s*"
+                          r"|(?:function\s+)?\w+\s*\(\)\s*\{?\s*)")
+# A loop variable is resolved only if every item is a test path (`foreach ($t in @("$b\c", "$b\r"))`).
+PS_FOREACH = re.compile(r"^foreach\s*\(\s*\$(\w+)\s+in\s+((?:[^()]|\([^()]*\))*)\)\s*\{?\s*", re.IGNORECASE)
+BASH_FOR = re.compile(r"^for\s+(\w+)\s+in\s+(.*)$", re.DOTALL)
+JOIN_PATH = re.compile(r"^Join-Path\s+(.+)$", re.IGNORECASE | re.DOTALL)
+
+
+def without_control(segment, powershell):
+    pattern = PS_CONTROL if powershell else BASH_CONTROL
+    while True:
+        rest = pattern.sub("", segment, count=1)
+        if rest == segment:
+            return segment
+        segment = rest
+
+
+def bind_loop(segment, powershell, variables, cwd):
+    """Binds a loop variable whose items are all test paths; returns the segment after the loop header."""
+    m = (PS_FOREACH if powershell else BASH_FOR).match(segment.strip())
+    if not m:
+        return segment
+    items = m.group(2).strip()
+    if powershell:
+        items = re.sub(r"^@?\((.*)\)$", r"\1", items, flags=re.DOTALL)
+        values = [expand(v.strip().strip("'\""), variables) for v in items.split(",") if v.strip()]
+    else:
+        values = [expand(v, variables) for v in tokenize(items, False)]
+    if values and all(is_test_path(v, cwd) for v in values):
+        variables[m.group(1)] = values[0]
+    return segment.strip()[m.end():] if powershell else ""
+
+
+def ps_value(value, variables):
+    """Value of a PowerShell assignment: a string or `Join-Path a b`."""
+    join = JOIN_PATH.match(value)
+    if join:
+        parts = [expand(t, variables) for t in tokenize(join.group(1), True)
+                 if t.lower() not in ("-path", "-childpath")]
+        return "\\".join(parts)
+    return expand(value.strip("'\""), variables)
+
+
 def guard_tester(data):
     ti = data.get("tool_input", {})
     cwd = data.get("cwd", "")
@@ -330,9 +384,11 @@ def guard_tester(data):
     command = HEREDOC.sub(lambda m: m.group(3), ti.get("command", ""))  # heredoc bodies are data
     variables = {name: tempfile.gettempdir() for name in TEMP_VARIABLES}
     for seg in split_segments(command, powershell):
+        seg = without_control(seg, powershell)
+        seg = without_control(bind_loop(seg, powershell, variables, cwd), powershell)
         assignment = PS_ASSIGNMENT.match(seg) if powershell else None
         if assignment:
-            variables[assignment.group(1)] = expand(assignment.group(2).strip("'\""), variables)
+            variables[assignment.group(1)] = ps_value(assignment.group(2), variables)
             continue
         for target in redirect_targets(seg, powershell):
             target = expand(target, variables)
@@ -373,6 +429,7 @@ def check_log_time(destino):
 
 # Bloque `Comentarios:` del documenter para el engineer (lo ubica hooks/ubicar_comentarios.py).
 COMENTARIOS = re.compile(r"^comentarios-t\d+\.md$")
+PAGINA = (".html", ".css", ".js", ".json", ".svg")  # la página de un Artifact de /design, nunca del repo
 
 
 def guard_architect_files(data, memory_dir="~/.claude/agent-memory"):
@@ -387,13 +444,15 @@ def guard_architect_files(data, memory_dir="~/.claude/agent-memory"):
     if destino.startswith(memory):
         return
     temporal = os.path.normcase(os.path.abspath(tempfile.gettempdir()))
-    if destino.startswith(temporal) and COMENTARIOS.match(os.path.basename(destino)):
+    if destino.startswith(temporal) and (COMENTARIOS.match(os.path.basename(destino))
+                                         or destino.endswith(PAGINA)):
         return
     if LOG_DIR in re.split(r"[\\/]", destino.lower())[:-1]:
         check_log_time(destino)
         return
     deny("Bloqueado: el software-architect no edita archivos (solo su memoria en "
-         f"{memory_dir}/, el registro en prompt-log/ y comentarios-Tn.md en su scratchpad). "
+         f"{memory_dir}/, el registro en prompt-log/ y, en su scratchpad, comentarios-Tn.md y la "
+         "página de /design). "
          "Delegá el cambio al software-engineer.")
 
 

@@ -31,7 +31,7 @@ del proyecto:
 
 | Comando | Cuándo |
 |---|---|
-| `python ~/.claude/hooks/monitor_agentes.py tarea --desde main` | Al cerrar una tarea: alertas de los agentes nuevos (relecturas, bloqueos, vueltas de corrección, archivos fuera del pedido, dependencias, tests de más o cambiados, costo contra la mediana con las 3 salidas más grandes, modelo) |
+| `python ~/.claude/hooks/monitor_agentes.py tarea --desde main` | Al cerrar una tarea: alertas de los agentes nuevos (relecturas, bloqueos con el comando y el motivo, vueltas de corrección, archivos fuera del pedido, dependencias, tests de más o cambiados, costo contra la mediana con las 3 salidas más grandes, modelo) |
 | `python ~/.claude/hooks/monitor_agentes.py etapa --desde <commit>` | Al cumplir un objetivo: tokens por agente, tareas más caras y señales repetidas |
 
 ## El equipo
@@ -51,7 +51,7 @@ todos los proyectos. En el `CLAUDE.md` de cada proyecto, la sección `## Documen
 lo propio: los links de la carpeta del proyecto, de la de código y de "Conceptos generales", y qué
 carpetas del código se documentan. Cada documento nuevo se crea en una sola llamada, desde HTML con los
 estilos de la plantilla. Al cerrar cada tarea también actualiza el "Panorama del proyecto" si existe en
-la carpeta del proyecto, y los documentos que sobran los mueve a `Para borrar`, ahí mismo.
+la carpeta del proyecto (un índice y un documento por etapa, si el usuario decidió partirlo), y los documentos que sobran los mueve a `Para borrar`, ahí mismo.
 
 ## Estructura
 
