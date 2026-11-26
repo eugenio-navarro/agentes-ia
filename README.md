@@ -41,6 +41,7 @@ del proyecto:
 | **architect** | Entiende el pedido, decide la arquitectura, delega y valida | Editar código | Opus |
 | **engineer** | Implementa hasta que los tests pasen y commitea | Modificar los tests del tester, hacer push | Sonnet |
 | **tester** | Escribe los tests antes del código y verifica después | Tocar código de producción, commitear | Haiku |
+| **tester-codex** | Puente: le pasa los briefs del tester a Codex (`codex exec -p software-tester`) y devuelve su reporte. El architect lo usa en lugar del tester y, si Codex falla, vuelve al de Claude. Solo en Claude Code | Hacer el trabajo él mismo; lo mismo que el tester | Haiku (Codex usa el modelo de su perfil) |
 | **documenter** | Al cerrar cada tarea, documenta en Google Drive los archivos que cambiaron, con la estructura de carpetas del proyecto y el formato de tu plantilla. Corrige solo los nombres mal escritos o mal ubicados. Solo si el `CLAUDE.md` del proyecto tiene `## Documentación en Drive` | Modificar el repo, compartir o borrar documentos | Sonnet |
 
 Todos siguen [FILOSOFIA.md](FILOSOFIA.md). Cada proyecto puede ajustarla en su `CLAUDE.md`.
@@ -63,7 +64,7 @@ la carpeta del proyecto (un índice y un documento por etapa, si el usuario deci
 | `mods/` | Mods de Claude Code (cambios a su interfaz y comportamiento), cada uno con sus tests. Hoy: `context-saver` y `mapa-agentes` |
 | `extra/BITACORA.md` | Decisiones, limitaciones y fallas encontradas (lo mantiene la IA) |
 | `extra/INSTALAR.md` | Instrucciones para que una IA instale el equipo |
-| `extra/instalar_claude_code.py` | Instala o actualiza el equipo en Claude Code (`~/.claude`) a partir del repo |
+| `extra/instalar_claude_code.py` | Instala o actualiza el equipo en Claude Code (`~/.claude`) a partir del repo, y también en Codex si está instalado |
 | `extra/instalar_opencode.py` | Instala o actualiza el equipo en OpenCode (`~/.config/opencode`) a partir del repo |
 | `extra/OPENCODE.md` | Detalle de la instalación en OpenCode: qué cambia, modelos por nivel y limitaciones |
 | `extra/instalar_codex.py` | Instala o actualiza el equipo en Codex (`~/.codex`) a partir del repo |

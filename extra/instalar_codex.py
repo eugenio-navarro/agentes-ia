@@ -72,7 +72,8 @@ REEMPLAZOS = [
      "mandale un mensaje a su hilo con send_message en vez de lanzar uno nuevo"),
     ("SendMessage", "send_message"),
     ("(llamada a Agent)", "(llamada a spawn_agent)"),
-    ("Delegá con la herramienta Agent (software-engineer, software-tester o software-documenter).",
+    ("Delegá con la herramienta Agent (software-engineer, software-tester, software-tester-codex o\n"
+     "  software-documenter).",
      "Delegá con spawn_agent y `agent_type` software-engineer o software-tester (un hook bloquea "
      "cualquier otro tipo)."),
     ("varias llamadas a Agent en el mismo mensaje", "varios spawn_agent seguidos"),
@@ -115,6 +116,8 @@ NOTA_ARQUITECTO = """
 - El software-documenter no existe en Codex (usa los conectores de Google Drive de claude.ai).
   Si el proyecto tiene `## Documentación en Drive`, saltá ese paso y avisale al usuario que la
   documentación se hace desde Claude Code.
+- El software-tester-codex (el puente de Claude Code al tester de Codex) no existe acá: el
+  software-tester ya es el de Codex.
 - `monitor_agentes.py` lee lo que guarda Claude Code y no funciona con Codex. Donde el flujo pide
   el monitoreo, revisá vos `git diff --stat <base>` y el reporte de cada agente, y analizá las
   fallas por su causa igual que con las alertas.
@@ -277,7 +280,9 @@ if (-not $paquete) {
 }
 $exe = Join-Path $paquete.InstallLocation 'app\\resources\\codex.exe'
 # Sin --no-daemon la interfaz falla: "this CLI has no complete local package".
-if ($MyInvocation.ExpectingInput) { $input | & $exe --no-daemon @args } else { & $exe --no-daemon @args }
+# codex.exe hereda la entrada de este proceso: reenviarla con `$input |` espera a que se cierre y
+# traba a quien la deja abierta (el plugin de Codex habla con `codex app-server` por ahi).
+& $exe --no-daemon @args
 exit $LASTEXITCODE
 """
 ATAJO_CMD = ("@echo off\r\nrem Atajo de agentes-ia para cmd: delega en codex.ps1 (misma carpeta).\r\n"
@@ -301,7 +306,7 @@ def plan(destino, modelos, bin_dir=None):
     archivos = []
     for agente in sorted((REPO / "agents").glob("*.md")):
         texto = agente.read_text(encoding="utf-8")
-        if base.sin_equivalente(texto):  # software-documenter: conectores de claude.ai
+        if base.sin_equivalente(texto):  # documenter (conectores de claude.ai) y el puente a Codex
             continue
         nombre, contenido = perfil(texto, modelos)
         archivos.append((destino / f"{nombre}.config.toml", contenido.encode("utf-8")))

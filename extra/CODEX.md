@@ -109,6 +109,11 @@ instrucciones. Después aplica las reglas de `agent_guard.py` sin duplicarlas:
 - **LSP y `AskUserQuestion`**: no hay equivalente; se usan el type checker del proyecto y una
   pregunta directa en la respuesta.
 - **Mods de Claude Code** (`mods/`): son de la interfaz de Claude Code y no aplican.
+- **Tester de Codex desde Claude Code**: el agente `software-tester-codex` (solo en Claude Code) le
+  pasa el brief a `codex exec -p software-tester -s workspace-write` por la entrada y devuelve la
+  respuesta. Por el atajo `codex` no se puede pasar `-` como prompt (PowerShell con `-File` no lo
+  acepta): sin prompt, Codex lee la entrada. `instalar_claude_code.py` también actualiza Codex, para
+  que el tester de los dos lados tenga las mismas reglas.
 - **Hooks sin aprobar**: hasta que se aprueban con `/hooks`, Codex no los corre y no hay límites
   de rol (las instrucciones de cada agente siguen diciendo qué no hacer).
 

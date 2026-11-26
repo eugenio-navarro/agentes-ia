@@ -104,6 +104,9 @@ class InstalacionTest(unittest.TestCase):
         self.assertIn("Get-AppxPackage", ps1)
         # El CLI de la app no abre la interfaz con el servidor de fondo: "no complete local package".
         self.assertIn("--no-daemon", ps1)
+        # Reenviar la entrada con `$input |` traba a quien la deja abierta (codex app-server).
+        self.assertIn("\n& $exe --no-daemon @args\n", ps1)
+        self.assertNotIn("$input |", ps1.replace("`$input |`", ""))
 
     def test_es_idempotente(self):
         self.assertIn("Todo al dia", instalar_en(self.destino, self.bin))

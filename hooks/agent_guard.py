@@ -466,8 +466,9 @@ def main():
         return
     # Hooks of an agent run with `claude --agent` apply to the whole session,
     # including the subagents it spawns: only guard the agent's own tool calls.
+    # software-tester-codex (el puente al tester de Codex) tiene los mismos límites que el tester.
     agent = data.get("agent_type") or ""
-    if agent and agent != f"software-{role}":
+    if agent and agent not in (f"software-{role}", f"software-{role}-codex"):
         return
     if role == "architect":
         guard_architect(data)

@@ -45,7 +45,9 @@ MODELOS = {
 COLORES = {"purple": "#a855f7", "blue": "#3b82f6", "green": "#22c55e"}
 
 # Capacidades sin equivalente en OpenCode: el agente que las usa no se instala.
-SIN_EQUIVALENTE = {"drive"}  # conectores de Google Drive/Docs de claude.ai (software-documenter)
+# `drive`: conectores de Google Drive/Docs de claude.ai (software-documenter). `codex`: el puente al tester
+# de Codex (software-tester-codex); en OpenCode y en Codex se usa el software-tester directo.
+SIN_EQUIVALENTE = {"drive", "codex"}
 
 # Comandos de solo lectura del architect (misma lista que hooks/agent_guard.py).
 COMANDOS_LECTURA = [

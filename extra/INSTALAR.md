@@ -28,7 +28,7 @@ Requisitos: Python 3 en el PATH (hooks) y Node/npx (Playwright del tester).
 | `mode` | `principal`: se inicia como agente de la sesión. `subagente`: lo invoca el architect. |
 | `model` | `alto` (razonamiento fuerte), `medio` (código, costo medio), `liviano` (barato). Usá el alias más reciente de cada nivel. |
 | `effort` | Nivel de razonamiento, si la herramienta lo soporta. |
-| `tools` | Capacidades: `read` (leer/buscar), `edit`, `lsp`, `shell`, `web`, `todo`, `ask-user`, `delegate`, `skills`, `browser`, `drive` (Google Drive y Docs: buscar, leer, crear carpetas, copiar, mover y editar Docs; sin compartir ni borrar). |
+| `tools` | Capacidades: `read` (leer/buscar), `edit`, `lsp`, `shell`, `web`, `todo`, `ask-user`, `delegate`, `skills`, `browser`, `drive` (Google Drive y Docs: buscar, leer, crear carpetas, copiar, mover y editar Docs; sin compartir ni borrar), `artifact` (páginas de claude.ai), `codex` (llamar al Codex CLI por consola; solo en Claude Code: donde no hay equivalente, el agente no se instala). |
 | `delegates` | Únicos subagentes que puede invocar. |
 | `memory` | Memoria persistente del agente (`user` = compartida entre proyectos). |
 | `guard` | Hook *antes* de cada herramienta: `python hooks/agent_guard.py <rol>`. |
@@ -86,6 +86,7 @@ Si una IA instala a mano, las reglas son estas:
   `__*`, para no dar `share_file` ni `trash_file`). Claude Code nombra cada conector distinto según dónde
   corre: `mcp__claude_ai_Google_Drive__…` en la terminal y VS Code, y `mcp__<id del conector>__…` en la
   app de escritorio. Se ponen las dos formas; el id es de cada cuenta (`CONECTORES` en el instalador).
+  `artifact` → `Artifact` · `codex` → nada (le alcanza con `shell`).
 - `guard: <rol>` → `hooks.PreToolUse` con matcher `"Bash|PowerShell|Edit|Write|NotebookEdit"` y
   `command: python "<ruta absoluta>/agent_guard.py" <rol>`.
 - `post-edit` → `hooks.PostToolUse` con matcher `"Edit|Write"` y

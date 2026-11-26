@@ -123,6 +123,23 @@ class TesterGuard(unittest.TestCase):
     def bash(self, cmd):
         return guard("tester", "Bash", agent="software-tester", command=cmd)
 
+    def test_el_puente_a_codex_tiene_los_limites_del_tester(self):
+        s = os.path.join(tempfile.gettempdir(), "claude", "x", "scratchpad", "codex-T7").replace("\\", "/")
+        def bash(cmd):
+            return guard("tester", "Bash", agent="software-tester-codex", command=cmd)
+        brief = (f"S={s}; mkdir -p \"$S/t\"; cat > \"$S/brief.md\" <<'FIN_DEL_BRIEF_DEL_ARCHITECT'\n"
+                 "Archivos esperados: src/main/kotlin/X.kt\n`./gradlew test > <scratchpad>/t.log`\n"
+                 "FIN_DEL_BRIEF_DEL_ARCHITECT")
+        lanzar = (f"S={s}; codex exec -p software-tester -C \"$(pwd -W)\" -s workspace-write "
+                  "--add-dir \"$(cygpath -w \"$S\")\" -o \"$(cygpath -w \"$S/respuesta.md\")\" "
+                  "< \"$S/brief.md\" > \"$S/codex.log\" 2>&1; echo $? > \"$S/fin\"")
+        esperar = f"S={s}; timeout 540 bash -c \"until [ -f '$S/fin' ]; do sleep 20; done\"; ls -l \"$S\""
+        for cmd in (brief, lanzar, esperar):
+            self.assertEqual(bash(cmd), 0, cmd)
+        self.assertEqual(bash("echo x > src/main/kotlin/X.kt"), 2)
+        self.assertEqual(guard("tester", "Edit", agent="software-tester-codex",
+                               file_path="src/main/kotlin/X.kt"), 2)
+
     def test_edita_archivos_de_test(self):
         for p in ("src/test/kotlin/EsParTest.kt", "tests/test_math.py", "src/utils.test.ts",
                   "conftest.py", "MyApp.Tests/CalcTests.cs", "Assets/Tests/EditMode/T.cs",

@@ -31,9 +31,9 @@ class TraduccionTest(unittest.TestCase):
             nombre, texto = inst.traducir(archivo.read_text(encoding="utf-8"), self.hooks)
             self.agentes[nombre] = (archivo, texto)
 
-    def test_instala_los_cuatro_agentes_con_su_nombre(self):
-        self.assertEqual(set(self.agentes), {"software-architect", "software-engineer",
-                                             "software-tester", "software-documenter"})
+    def test_instala_los_agentes_con_su_nombre(self):
+        self.assertEqual(set(self.agentes), {"software-architect", "software-engineer", "software-tester",
+                                             "software-tester-codex", "software-documenter"})
 
     def test_el_cuerpo_queda_igual_al_del_repo(self):
         for archivo, texto in self.agentes.values():
@@ -44,11 +44,12 @@ class TraduccionTest(unittest.TestCase):
         modelos = {n: re.search(r"^model: (\w+)$", frontmatter(t), re.M).group(1)
                    for n, (_, t) in self.agentes.items()}
         self.assertEqual(modelos, {"software-architect": "opus", "software-engineer": "sonnet",
-                                   "software-tester": "haiku", "software-documenter": "sonnet"})
+                                   "software-tester": "haiku", "software-tester-codex": "haiku",
+                                   "software-documenter": "sonnet"})
 
     def test_el_architect_delega_solo_en_su_equipo(self):
         fm = frontmatter(self.agentes["software-architect"][1])
-        self.assertIn("Agent(software-engineer, software-tester, software-documenter)", fm)
+        self.assertIn("Agent(software-engineer, software-tester, software-tester-codex, software-documenter)", fm)
         self.assertIn("ToolSearch", fm)
         self.assertNotIn("Edit,", fm)
 
@@ -63,6 +64,12 @@ class TraduccionTest(unittest.TestCase):
         locales = {t for t in tools if not t.startswith("mcp__")}
         self.assertEqual(locales, {"Read", "Glob", "Grep", "ToolSearch"})
         self.assertFalse([t for t in tools if t.endswith(("share_file", "trash_file", "__*"))])
+
+    def test_el_puente_a_codex_solo_lee_y_corre_comandos_con_el_hook_del_tester(self):
+        fm = frontmatter(self.agentes["software-tester-codex"][1])
+        tools = set(re.search(r"^tools: (.*)$", fm, re.M).group(1).split(", ")) - {"PowerShell"}
+        self.assertEqual(tools, {"Read", "Glob", "Grep", "Bash", "ToolSearch"})
+        self.assertIn('agent_guard.py\\" tester', fm)
 
     def test_hooks_con_ruta_absoluta(self):
         fm = frontmatter(self.agentes["software-tester"][1])
@@ -84,7 +91,7 @@ class InstalacionTest(unittest.TestCase):
             destino = Path(tmp)
             (destino / "CLAUDE.md").write_text("# Mis instrucciones\n\nNo borrar esto.\n", encoding="utf-8")
             instalar_en(destino)
-            self.assertEqual(len(list((destino / "agents").glob("*.md"))), 4)
+            self.assertEqual(len(list((destino / "agents").glob("*.md"))), 5)
             self.assertTrue((destino / "hooks" / "agent_guard.py").exists())
             self.assertFalse((destino / "hooks" / "test_hooks.py").exists())
             for copia in [destino / "FILOSOFIA.md", *(destino / "hooks").glob("*.py")]:
@@ -107,6 +114,20 @@ class InstalacionTest(unittest.TestCase):
             salida = instalar_en(Path(tmp), simular=True)
             self.assertIn("[simulación] crear: agents/software-architect.md", salida)
             self.assertEqual(list(Path(tmp).iterdir()), [])
+
+
+class CodexTest(unittest.TestCase):
+    def test_si_codex_esta_instalado_tambien_lo_actualiza(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            codex = Path(tmp) / ".codex"
+            with contextlib.redirect_stdout(io.StringIO()):
+                inst.actualizar_codex(False, codex)  # sin la carpeta: no hay Codex, no hace nada
+            self.assertFalse(codex.exists())
+            codex.mkdir()
+            with contextlib.redirect_stdout(io.StringIO()):
+                inst.actualizar_codex(False, codex)
+            self.assertTrue((codex / "agents" / "software-tester.toml").is_file())
+            self.assertFalse((codex / "software-tester-codex.config.toml").exists())
 
 
 class ModsTest(unittest.TestCase):

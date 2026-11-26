@@ -21,6 +21,9 @@ Qué hace en `~/.claude` (el repo es la fuente de verdad):
 Antes de reemplazar un archivo que cambia, guarda la versión anterior en
 `~/.claude/backups-agentes/<fecha>/`. Si no cambia, no lo toca. No edita settings.json: lo único que
 lo cambia es el registro de los mods, que hace la CLI de Claude.
+Si Codex está instalado (`$CODEX_HOME` o `~/.codex`), también actualiza su equipo con
+`instalar_codex.py`: el software-tester-codex de Claude Code usa el tester de Codex, y los dos tienen que
+estar al día (con `--destino`, no).
 """
 import argparse
 import datetime
@@ -50,6 +53,7 @@ TOOLS = {
     "shell": ["Bash", "PowerShell"], "web": ["WebFetch", "WebSearch"], "todo": ["TodoWrite"],
     "ask-user": ["AskUserQuestion"], "skills": ["Skill"], "browser": ["mcp__playwright__*"],
     "artifact": ["Artifact"],  # páginas de claude.ai: las usa /design (software-architect)
+    "codex": [],  # el Codex CLI por consola (software-tester-codex): alcanza con `shell`
     "drive": [f"mcp__{servidor}__{tool}" for servidores, tools in CONECTORES.values()
               for servidor in servidores for tool in tools],
 }
@@ -252,6 +256,17 @@ def registrar_mods(destino, simular, entorno=None, ejecutar=subprocess.run, busc
         print(f"mod {mod}: {estado}{detalle}")
 
 
+def actualizar_codex(simular, codex_home=None, bin_dir=None):
+    """Si Codex está instalado, actualiza también su equipo (el puente software-tester-codex lo usa)."""
+    destino = Path(codex_home or os.environ.get("CODEX_HOME") or Path.home() / ".codex").expanduser()
+    if not destino.is_dir():
+        return
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import instalar_codex
+    print("Codex:")
+    instalar_codex.instalar(destino, simular, dict(instalar_codex.MODELOS), bin_dir)
+
+
 def main():
     for flujo in (sys.stdout, sys.stderr):  # consola de Windows sin UTF-8
         reconfigurar = getattr(flujo, "reconfigure", None)
@@ -267,6 +282,8 @@ def main():
     # Con --destino la CLI tiene que registrar los mods en esa carpeta y no en la del usuario.
     entorno = {**os.environ, "CLAUDE_CONFIG_DIR": str(destino)} if args.destino else None
     registrar_mods(destino, args.simular, entorno)
+    if not args.destino:
+        actualizar_codex(args.simular, bin_dir=Path.home() / ".local" / "bin" if EN_WINDOWS else None)
 
 
 if __name__ == "__main__":
