@@ -47,11 +47,12 @@ const TEST_DIRS = new Set([
 
 const TEST_FILE = /(^test_|_test\.|\.test\.|\.spec\.|_spec\.|tests?\.[a-z]+$|spec\.[a-z]+$|^conftest\.py$|^pytest\.ini$|^jest\.config|^vitest\.config|^playwright\.config|^cypress\.config|^karma\.conf)/i
 const TEST_DIR_SUFFIX = /([._-](unit|integration|e2e)?tests?|(unit|integration)tests)$/i
+const E2E_DIR = /^e2e[._-]/i  // variantes de e2e/: e2e-real, e2e_smoke
 
 const GENERATED_DIRS = new Set([
   "build", "dist", "out", "target", "__pycache__", ".pytest_cache",
   ".mypy_cache", ".ruff_cache", "coverage", "htmlcov", ".nyc_output",
-  "test-results", "playwright-report", ".gradle", "bin", "obj",
+  "test-results", "playwright-report", ".playwright-mcp", ".gradle", "bin", "obj",
 ])
 
 const NULL_TARGETS = new Set(["/dev/null", "$null", "nul"])
@@ -178,7 +179,7 @@ function isTestPath(target, cwd) {
   if (norm.startsWith(tmp)) return true
   const parts = norm.split(/[\\/]/)
   const dirs = parts.slice(0, -1)
-  if (dirs.some((p) => TEST_DIRS.has(p) || GENERATED_DIRS.has(p) || TEST_DIR_SUFFIX.test(p))) return true
+  if (dirs.some((p) => TEST_DIRS.has(p) || GENERATED_DIRS.has(p) || TEST_DIR_SUFFIX.test(p) || E2E_DIR.test(p))) return true
   const file = parts[parts.length - 1]
   return GENERATED_DIRS.has(file) || file === ".coverage" || TEST_FILE.test(file)
 }

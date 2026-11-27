@@ -136,7 +136,7 @@ TEST_FILE = re.compile(
 # Generated artifacts the tester may clean or overwrite (not production code).
 GENERATED_DIRS = {"build", "dist", "out", "target", "__pycache__", ".pytest_cache",
                   ".mypy_cache", ".ruff_cache", "coverage", "htmlcov", ".nyc_output",
-                  "test-results", "playwright-report", ".gradle", "bin", "obj"}
+                  "test-results", "playwright-report", ".playwright-mcp", ".gradle", "bin", "obj"}
 NULL_TARGETS = {"/dev/null", "$null", "nul"}
 
 
@@ -155,6 +155,7 @@ def to_abs(path, cwd=""):
 
 # C#/.NET test projects: MyApp.Tests, MyApp.UnitTests, my-app-test, CoreUnitTests
 TEST_DIR_SUFFIX = re.compile(r"([._-](unit|integration|e2e)?tests?|(unit|integration)tests)$")
+E2E_DIR = re.compile(r"^e2e[._-]")  # variantes de e2e/: e2e-real, e2e_smoke
 
 
 def is_test_path(path, cwd=""):
@@ -163,7 +164,7 @@ def is_test_path(path, cwd=""):
     if norm.startswith(tmp):
         return True
     parts = re.split(r"[\\/]", norm.lower())  # normcase only lowercases on Windows
-    if any(p in TEST_DIRS or p in GENERATED_DIRS or TEST_DIR_SUFFIX.search(p)
+    if any(p in TEST_DIRS or p in GENERATED_DIRS or TEST_DIR_SUFFIX.search(p) or E2E_DIR.match(p)
            for p in parts[:-1]):
         return True
     return parts[-1] in GENERATED_DIRS or parts[-1] == ".coverage" or \

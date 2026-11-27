@@ -166,6 +166,16 @@ class TesterGuard(unittest.TestCase):
             self.assertFalse(agent_guard.is_test_path("src/main/resources/x.png", repo))  # no es la raíz
             self.assertFalse(agent_guard.is_test_path("notas.md", repo))
 
+    def test_las_variantes_de_e2e_y_las_capturas_del_mcp_son_de_prueba(self):
+        sys.path.insert(0, HERE)
+        import agent_guard
+        p = "C:/p/panel"
+        self.assertTrue(agent_guard.is_test_path(f"{p}/e2e-real/administrador.ts"))
+        self.assertTrue(agent_guard.is_test_path(f"{p}/e2e_smoke/datos.ts"))
+        self.assertTrue(agent_guard.is_test_path("C:/p/.playwright-mcp/login.png"))
+        self.assertFalse(agent_guard.is_test_path(f"{p}/e2eutil/x.ts"))
+        self.assertFalse(agent_guard.is_test_path(f"{p}/src/e2e-config.ts"))
+
     def test_edita_archivos_de_test(self):
         for p in ("src/test/kotlin/EsParTest.kt", "tests/test_math.py", "src/utils.test.ts",
                   "conftest.py", "MyApp.Tests/CalcTests.cs", "Assets/Tests/EditMode/T.cs",

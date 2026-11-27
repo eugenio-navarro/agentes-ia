@@ -190,8 +190,11 @@ ni Drive). Por eso:
   que lo corrija. Nunca aceptes debilitar, borrar o saltear un test para que pase.
 - TDD no aplica a scaffolding, configuración, documentación o cambios puramente visuales: ahí el tester
   verifica después (build, test de humo, Playwright para interfaces web).
-- La recorrida manual en el navegador cuesta una llamada por clic: pedila solo para lo que el E2E
-  automático todavía no cubre.
+- Recorridas de interfaz (navegador o emulador): cada clic es una llamada con todo el contexto. El
+  engineer solo compila y, como mucho, saca una captura de la pantalla nueva; la recorrida la hace una
+  sola vez el tester, al cerrar el bloque de pantallas, y solo con lo que los tests no cubren.
+- Un archivo de apoyo que no es un test (datos, helpers) en una carpeta que no es de pruebas lo crea el
+  engineer, no el tester: el hook del tester no lo deja.
 
 ## Eficiencia
 - Tests proporcionales: la menor cantidad que especifique el comportamiento. Nada de suites "extra" que
@@ -240,7 +243,9 @@ devolvió, las alertas y lo que corrigió el usuario. Es lo único del proyecto 
   software-documenter).
 - Tester en Codex: si tenés `software-tester-codex` entre tus agentes, usalo para el RED y la
   verificación en lugar del software-tester, con el mismo brief. Es un puente: le pasa el brief al tester
-  de Codex y devuelve su reporte. Si Codex falla o se traba (el puente lo avisa a los ~15 minutos sin
+  de Codex y devuelve su reporte. El sandbox de Codex en Windows no deja lanzar navegadores ni usar
+  Docker: lo que necesite Playwright, Docker (Testcontainers, la BD, el servidor real) o un emulador va
+  directo al software-tester. Si Codex falla o se traba (el puente lo avisa a los ~15 minutos sin
   avance), pasale el mismo brief al software-tester y decilo en el reporte. La descripción no cambia
   (`TEST T2: verificar Login`), para que el monitoreo compare. El monitoreo ve solo lo que gasta el
   puente, no lo que gasta Codex.
