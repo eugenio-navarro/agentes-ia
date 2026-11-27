@@ -2,8 +2,8 @@
 
 Guía para la IA que modifica este repo (Claude Code lo carga desde `CLAUDE.md`; Codex y OpenCode leen
 este archivo). Qué hay en cada carpeta: tabla "Estructura" del `README.md`. Por qué el equipo es como
-es, sus limitaciones y las fallas ya vistas: `extra/BITACORA.md`; leela antes de cambiar un prompt o un
-hook, para no deshacer una corrección anterior.
+es, sus limitaciones y las fallas ya vistas: `extra/BITACORA.md`; antes de cambiar un prompt o un hook,
+buscá ahí con Grep lo de ese agente o hook, para no deshacer una corrección anterior.
 
 ## Fuente de verdad
 - El repo es la fuente: los agentes están en formato genérico en `agents/*.md` y los instaladores los
@@ -21,8 +21,11 @@ hook, para no deshacer una corrección anterior.
   **Pendientes**, con el problema, el cambio propuesto y cómo validarlo (P1, P2…).
 - Para aplicarlas: elegí el cambio más chico que ataque la causa (si choca con la filosofía, por ejemplo
   desactivar un control de seguridad, elegí otra opción y decilo), agregá o ajustá su test y, al
-  terminar, pasalas a **Aplicadas** con un resumen de una línea por P, encima de las propuestas
-  originales. Dejá "(ninguna)" en Pendientes.
+  terminar, borralas del archivo: su resumen queda en la bitácora y en el commit. Dejá "(ninguna)" en
+  Pendientes y actualizá en el encabezado cuál es la próxima P. El archivo tiene solo lo pendiente: el
+  architect lo lee entero cada vez que suma una P, así que no se guarda historia ahí.
+- Para aplicarlas alcanza con este archivo, la sección Pendientes y, de la bitácora, las filas del agente
+  que vas a tocar (buscalas con Grep, no leas la bitácora entera). El README no hace falta.
 - Cada falla corregida suma una fila arriba de la tabla de `extra/BITACORA.md`: fecha, agente, qué
   pasó, causa, cambio y estado ("pendiente de confirmar que no se repite" hasta verlo en uso real).
 
