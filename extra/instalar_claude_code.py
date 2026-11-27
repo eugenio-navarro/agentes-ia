@@ -50,7 +50,8 @@ CONECTORES = {
                "b58d2313-c33b-4fa7-aab2-5f527741f0fa"],
               ["search_files", "get_file_metadata", "read_file_content", "create_file", "copy_file",
                "update_file"]),
-    "docs": (["claude_ai_Google_Docs", "242c3fa4-aa6b-4314-9ce8-b9b0e7cb2a0f"], ["read_doc", "update_doc"]),
+    "docs": (["claude_ai_Google_Docs", "242c3fa4-aa6b-4314-9ce8-b9b0e7cb2a0f",
+              "dedc5b6c-8785-46b0-9ddd-a1a8656adc77"], ["read_doc", "update_doc"]),
 }
 TOOLS = {
     "read": ["Read", "Glob", "Grep"], "edit": ["Edit", "Write", "NotebookEdit"], "lsp": ["LSP"],

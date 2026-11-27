@@ -60,7 +60,8 @@ class TraduccionTest(unittest.TestCase):
         for servidor in ("claude_ai_Google_Drive", "af2aec09-1933-4981-923f-d988ecaeaad4",
                          "b58d2313-c33b-4fa7-aab2-5f527741f0fa"):
             self.assertIn(f"mcp__{servidor}__copy_file", tools)
-        for servidor in ("claude_ai_Google_Docs", "242c3fa4-aa6b-4314-9ce8-b9b0e7cb2a0f"):
+        for servidor in ("claude_ai_Google_Docs", "242c3fa4-aa6b-4314-9ce8-b9b0e7cb2a0f",
+                         "dedc5b6c-8785-46b0-9ddd-a1a8656adc77"):
             self.assertIn(f"mcp__{servidor}__update_doc", tools)
         locales = {t for t in tools if not t.startswith("mcp__")}
         self.assertEqual(locales, {"Read", "Glob", "Grep", "ToolSearch"})
