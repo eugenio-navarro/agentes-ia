@@ -40,10 +40,14 @@ LINEA_FILOSOFIA = "@~/.claude/FILOSOFIA.md"
 MODELOS = {"alto": "opus", "medio": "sonnet", "liviano": "haiku"}
 # Conectores de Google Drive y Google Docs de claude.ai. Claude Code los nombra distinto según dónde corre:
 # `claude_ai_Google_Drive` en la terminal y VS Code, y con el id del conector en la cuenta en la app de
-# escritorio (se ve en los nombres de herramientas `mcp__<id>__...`). Solo las herramientas que usa el
-# documenter: buscar, leer, crear carpetas y Docs (desde HTML), copiar, mover/renombrar y editar Docs.
+# escritorio (se ve en los nombres de herramientas `mcp__<id>__...`). El id cambia con cada cuenta de
+# claude.ai: al cambiar de cuenta, sumá el nuevo (los viejos no molestan). No hay un patrón
+# documentado que no dependa del id, y `mcp__<id>__*` daría también share_file y trash_file. Solo las
+# herramientas que usa el documenter: buscar, leer, crear carpetas y Docs (desde HTML), copiar,
+# mover/renombrar y editar Docs.
 CONECTORES = {
-    "drive": (["claude_ai_Google_Drive", "af2aec09-1933-4981-923f-d988ecaeaad4"],
+    "drive": (["claude_ai_Google_Drive", "af2aec09-1933-4981-923f-d988ecaeaad4",
+               "b58d2313-c33b-4fa7-aab2-5f527741f0fa"],
               ["search_files", "get_file_metadata", "read_file_content", "create_file", "copy_file",
                "update_file"]),
     "docs": (["claude_ai_Google_Docs", "242c3fa4-aa6b-4314-9ce8-b9b0e7cb2a0f"], ["read_doc", "update_doc"]),

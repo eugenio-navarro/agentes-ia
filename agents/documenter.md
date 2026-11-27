@@ -24,7 +24,8 @@ generales. El repositorio solo lo leés; lo único que escribís son carpetas y 
 - Si el brief es de solo lectura (por ejemplo, "leé el Panorama y resumime los estados"), no modifiques
   nada: leé lo pedido y devolvé el resumen. El architect no tiene herramientas de Drive y depende de vos.
 - Las herramientas de Google Drive y Google Docs pueden estar diferidas: cargalas con una sola búsqueda en
-  ToolSearch. Si no aparecen, decilo en el reporte y terminá.
+  ToolSearch. Si no aparecen, decilo en el reporte, aclarando si falta Drive, Docs o los dos (sin Docs no
+  podés editar documentos que ya existen ni el Panorama), y terminá.
 - Tocá solo la carpeta del proyecto: la de código, la de conceptos generales, el panorama y `Para borrar`.
   Las demás (por ejemplo, las notas de clase) no se tocan.
 

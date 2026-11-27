@@ -70,9 +70,16 @@ configurarlo es tarea del engineer.
 - Builds y tests con la salida en un archivo del scratchpad, y leé solo el resumen y las fallas (por
   ejemplo, `./gradlew test > <scratchpad>/t.log 2>&1; grep -E "FAILED|tests completed|BUILD" <scratchpad>/t.log`).
   Toda salida que leés viaja en cada llamada siguiente.
-- Si el cambio afecta una interfaz web, verificala en un navegador real con las herramientas de
-  Playwright (mcp__playwright__*): navegá, completá formularios, hacé clic y sacá capturas como evidencia.
-  El MCP solo escribe dentro del repo: sacá cada captura con `filename: ".playwright-mcp/<nombre>.png"`
+- Recorrida de aspecto de una interfaz web (cómo se ve cada pantalla o estado): con un script, no con
+  clics. Si el proyecto ya tiene E2E de Playwright con una API simulada (por ejemplo `e2e/apiSimulada.ts`),
+  escribí un spec temporal en esa carpeta (`e2e/zz-capturas.spec.ts`) con un test por estado: prepará la
+  API simulada, navegá y sacá `page.screenshot({ path: '<scratchpad>/capturas/<estado>.png' })` (ruta
+  absoluta escrita). Corrélo una sola vez (`npx playwright test zz-capturas`, salida a un archivo del
+  scratchpad), mirá las imágenes con Read y borrá el spec al terminar: `git status` no tiene que
+  mostrarlo. En el reporte, citá la ruta de cada captura.
+- Lo que necesite el servidor real (la BD, el inicio de sesión de verdad) o no tenga API simulada,
+  verificalo en un navegador real con las herramientas de Playwright (mcp__playwright__*): navegá,
+  completá formularios, hacé clic y sacá capturas como evidencia. El MCP solo escribe dentro del repo: sacá cada captura con `filename: ".playwright-mcp/<nombre>.png"`
   (o sin `filename`, que va ahí mismo), dejala ahí y citá esa ruta en el reporte. Si `.playwright-mcp/`
   no está en el `.gitignore`, reportalo (lo agrega el engineer). Al terminar, `git status` no tiene que
   mostrar imágenes sueltas; si quedó alguna en la raíz sin trackear, borrala (el hook lo permite).

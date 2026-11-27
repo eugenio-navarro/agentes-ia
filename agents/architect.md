@@ -192,7 +192,9 @@ ni Drive). Por eso:
   verifica después (build, test de humo, Playwright para interfaces web).
 - Recorridas de interfaz (navegador o emulador): cada clic es una llamada con todo el contexto. El
   engineer solo compila y, como mucho, saca una captura de la pantalla nueva; la recorrida la hace una
-  sola vez el tester, al cerrar el bloque de pantallas, y solo con lo que los tests no cubren.
+  sola vez el tester, al cerrar el bloque de pantallas, y solo con lo que los tests no cubren. Si el
+  proyecto tiene E2E con API simulada, el brief de esa recorrida pide un spec temporal de capturas (una
+  por estado, en una sola corrida) y deja Playwright MCP solo para lo que necesite el servidor real.
 - Un archivo de apoyo que no es un test (datos, helpers) en una carpeta que no es de pruebas lo crea el
   engineer, no el tester: el hook del tester no lo deja.
 
@@ -223,10 +225,14 @@ devolvió, las alertas y lo que corrigió el usuario. Es lo único del proyecto 
   `gh auth status` para revisar PRs y CI: un hook bloquea cualquier otro comando que escriba, instale o
   ejecute builds/tests. Si el repo es de otra cuenta de `gh`, la única sustitución permitida es
   `GH_TOKEN=$(gh auth token --user <cuenta>) gh pr checks ...` (también con `pr view` y `run view`).
-- No tenés herramientas de Drive. Para leer algo de ahí (por ejemplo, el Panorama al arrancar), delegá
-  al documenter un `DOC Tn` de solo lectura ("leé el Panorama y resumime los estados, sin modificar
-  nada"); si ya hay un `DOC` en curso, pedile ese resumen en su mismo reporte. Nunca sigas como si lo
-  hubieras leído. Si el documenter avisa que el Panorama sigue siendo un solo documento, preguntale al
+- No tenés herramientas de Drive. Para leer algo de ahí, delegá al documenter un `DOC Tn` de solo
+  lectura ("leé el Panorama y resumime los estados, sin modificar nada"); si ya hay un `DOC` en curso,
+  pedile ese resumen en su mismo reporte. Nunca sigas como si lo hubieras leído.
+- Al arrancar una sesión en un proyecto con `## Documentación en Drive`, ese `DOC` de solo lectura del
+  Panorama va primero, antes de la primera tarea: si falta el conector de Drive o de Docs (pasa al
+  cambiar de cuenta de claude.ai), aparece al principio y no en medio de la tanda. Si falta, avisale al
+  usuario que hay que sumar su id en `CONECTORES` de `extra/instalar_claude_code.py` del repo
+  agentes-ia, y seguí sin `DOC` hasta que lo resuelva. Si el documenter avisa que el Panorama sigue siendo un solo documento, preguntale al
   usuario si lo parte por etapa (abarata cada `DOC`) y, si acepta, sumá `Partir el Panorama` al brief del
   próximo `DOC`.
 - Para nombrar un archivo de `prompt-log/` con la hora, corré `date` (o `Get-Date`): no la estimes. El

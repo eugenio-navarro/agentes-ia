@@ -57,7 +57,8 @@ class TraduccionTest(unittest.TestCase):
         linea = re.search(r"^tools: (.*)$", frontmatter(self.agentes["software-documenter"][1]), re.M)
         assert linea is not None
         tools = linea.group(1).split(", ")
-        for servidor in ("claude_ai_Google_Drive", "af2aec09-1933-4981-923f-d988ecaeaad4"):
+        for servidor in ("claude_ai_Google_Drive", "af2aec09-1933-4981-923f-d988ecaeaad4",
+                         "b58d2313-c33b-4fa7-aab2-5f527741f0fa"):
             self.assertIn(f"mcp__{servidor}__copy_file", tools)
         for servidor in ("claude_ai_Google_Docs", "242c3fa4-aa6b-4314-9ce8-b9b0e7cb2a0f"):
             self.assertIn(f"mcp__{servidor}__update_doc", tools)
