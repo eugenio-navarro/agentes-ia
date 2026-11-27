@@ -26,6 +26,10 @@ buscá ahí con Grep lo de ese agente o hook, para no deshacer una corrección a
   architect lo lee entero cada vez que suma una P, así que no se guarda historia ahí.
 - Para aplicarlas alcanza con este archivo, la sección Pendientes y, de la bitácora, las filas del agente
   que vas a tocar (buscalas con Grep, no leas la bitácora entera). El README no hace falta.
+- Ahorro de tokens (cada llamada reenvía toda la conversación): de un prompt de `agents/` leé solo la
+  sección que cambia (Grep y Read con offset/limit), juntá comandos independientes en una sola llamada
+  y no lances subagentes para este repo. El cuerpo del commit va en una o dos líneas: el detalle ya
+  está en la bitácora.
 - Cada falla corregida suma una fila arriba de la tabla de `extra/BITACORA.md`: fecha, agente, qué
   pasó, causa, cambio y estado ("pendiente de confirmar que no se repite" hasta verlo en uso real).
 
