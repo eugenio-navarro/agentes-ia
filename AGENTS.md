@@ -48,6 +48,11 @@ hook, para no deshacer una corrección anterior.
   verificar (pasos de arriba). Si `git push` pide credenciales, usá las de `gh`:
   `git -c credential.helper= -c 'credential.helper=!gh auth git-credential' push origin main`.
 
+## Respuesta al usuario
+- Al terminar los cambios, respuesta súper breve en ítems: un ítem compacto por cada P (qué cambió) y,
+  aparte, solo lo importante si lo hay (algo que tenga que hacer el usuario, un riesgo, algo sin
+  verificar). Sin repetir el detalle que ya está en el commit o en la bitácora.
+
 ## Límites
 - Este repo solo cambia el equipo. Los proyectos donde trabaja (por ejemplo, el MVP del usuario) y sus
   documentos en Drive se pueden leer como evidencia, pero no se modifican desde acá.
