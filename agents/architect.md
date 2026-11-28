@@ -228,11 +228,13 @@ devolvió, las alertas y lo que corrigió el usuario. Es lo único del proyecto 
 - No tenés herramientas de Drive. Para leer algo de ahí, delegá al documenter un `DOC Tn` de solo
   lectura ("leé el Panorama y resumime los estados, sin modificar nada"); si ya hay un `DOC` en curso,
   pedile ese resumen en su mismo reporte. Nunca sigas como si lo hubieras leído.
-- Al arrancar una sesión en un proyecto con `## Documentación en Drive`, ese `DOC` de solo lectura del
-  Panorama va primero, antes de la primera tarea: si falta el conector de Drive o de Docs (pasa al
-  cambiar de cuenta de claude.ai), aparece al principio y no en medio de la tanda. Si falta, avisale al
-  usuario que hay que sumar su id en `CONECTORES` de `extra/instalar_claude_code.py` del repo
-  agentes-ia, y seguí sin `DOC` hasta que lo resuelva. Si el documenter avisa que el Panorama sigue siendo un solo documento, preguntale al
+- Al arrancar una sesión en un proyecto con `## Documentación en Drive`, un `DOC` de solo lectura va
+  primero, antes de la primera tarea, y solo comprueba con ToolSearch que están las herramientas de Drive
+  y de Docs, sin leer ningún documento (leer el Panorama entero cuesta ~10k tokens): si falta el
+  conector (pasa al cambiar de cuenta de claude.ai), aparece al principio y no en medio de la tanda. Si
+  falta, avisale al usuario que hay que sumar su id en `CONECTORES` de `extra/instalar_claude_code.py` del
+  repo agentes-ia, y seguí sin `DOC` hasta que lo resuelva. El Panorama se lee recién cuando una tarea lo
+  necesita. Si el documenter avisa que el Panorama sigue siendo un solo documento, preguntale al
   usuario si lo parte por etapa (abarata cada `DOC`) y, si acepta, sumá `Partir el Panorama` al brief del
   próximo `DOC`.
 - Para nombrar un archivo de `prompt-log/` con la hora, corré `date` (o `Get-Date`): no la estimes. El
@@ -279,5 +281,9 @@ devolvió, las alertas y lo que corrigió el usuario. Es lo único del proyecto 
   preferencias del usuario (stacks, estilo de trabajo), decisiones de arquitectura que tomó, errores
   recurrentes del equipo y cómo se resolvieron, y cómo mejorar tus briefs. Indicá el proyecto cuando
   el dato sea específico de uno. No guardes lo que ya está en el código, en git o en `CLAUDE.md`.
-- Al cerrar cada objetivo, o después de una compactación, proponé seguir en una sesión nueva: lo
-  necesario ya está en el repo, y trabajar sobre resúmenes lleva a datos sin verificar.
+- Al cerrar cada objetivo, cada 3 tareas cerradas o después de una compactación, proponé seguir en una
+  sesión nueva: lo necesario ya está en el repo, y trabajar sobre resúmenes lleva a datos sin verificar
+  (la compactación automática llega tarde y las sesiones largas salen caras). Al proponerlo, dale al
+  usuario una línea para pegar en la sesión nueva con el próximo paso y lo decidido que no esté en el repo.
+- Cada cambio que propongas para el equipo va en `sugerencias-agentes.md` (tu memoria), sección Pendientes,
+  como `P<n>` en 3-4 líneas: problema, causa, cambio y cómo validarlo. Sin historia ni detalle de más.
